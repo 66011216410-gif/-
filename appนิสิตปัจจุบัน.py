@@ -17,19 +17,16 @@ REQUIRED_COLUMNS = [
 
 STATUS_EXCLUDE = ["เสียชีวิต", "พ้นสภาพคืนไม่ได้", "ลาออก"]
 
-
 def clean_text(x):
     if pd.isna(x):
         return ""
     return str(x).strip()
-
 
 def num(x):
     try:
         return float(x)
     except Exception:
         return None
-
 
 def calc_duration(row):
     """คำนวณระยะเวลาเป็นช่วง 0.5 ปีจากภาคที่เข้า -> ภาคที่จบ"""
@@ -40,7 +37,6 @@ def calc_duration(row):
     d = (y1 - y0) + (s1 - s0) * 0.5
     return round(d, 1) if d >= 0 else None
 
-
 def normalize_level(x):
     x = clean_text(x)
     if "เอก" in x:
@@ -48,7 +44,6 @@ def normalize_level(x):
     if "โท" in x:
         return "ป.โท"
     return x or "ไม่ระบุ"
-
 
 def status_group(x):
     s = clean_text(x)
@@ -68,7 +63,6 @@ def status_group(x):
         return "นิสิตปัจจุบัน"
     return s or "ไม่ระบุ"
 
-
 def read_excel(uploaded):
     df = pd.read_excel(uploaded, sheet_name="ข้อมูลนิสิต")
     df.columns = [clean_text(c) for c in df.columns]
@@ -77,17 +71,10 @@ def read_excel(uploaded):
         raise ValueError("ไม่พบคอลัมน์ที่จำเป็น: " + ", ".join(missing))
     return df
 
-
 def build_stats(df):
     work = df.copy()
     work["ระดับ"] = work["ระดับ"].map(normalize_level)
     work["สถานะกลุ่ม"] = work["สถานะนิสิต"].map(status_group)
-
-    # กฎข้อมูลจบ: เฉพาะผู้ที่มีสถานะ "สำเร็จการศึกษา" เท่านั้น
-    # ที่จะเก็บ ปีที่จบ / เทอมที่จบ / วันที่จบ
-    non_graduated = work["สถานะนิสิต"].map(clean_text) != "สำเร็จการศึกษา"
-    work.loc[non_graduated, ["ปีที่จบ", "เทอมที่จบ", "วันที่จบ"]] = pd.NA
-
     work["ระยะเวลา(ปี)"] = work.apply(calc_duration, axis=1)
 
     durations = [x / 2 for x in range(1, 23)]
@@ -99,7 +86,6 @@ def build_stats(df):
         g = work[work["ระดับ"] == level]
         if g.empty:
             continue
-
         r = {"ปีที่เข้า": level, "จำนวนนิสิตรับเข้า(คน)": len(g)}
         for d in durations:
             r[d] = int((g["ระยะเวลา(ปี)"] == d).sum())
@@ -170,7 +156,6 @@ def build_stats(df):
 
     return work, pd.DataFrame(rows)
 
-
 def make_excel(original, processed, stats):
     out = io.BytesIO()
     with pd.ExcelWriter(out, engine="openpyxl") as writer:
@@ -186,7 +171,6 @@ def make_excel(original, processed, stats):
                 ws.column_dimensions[col[0].column_letter].width = min(max(max_len, 10), 40)
     out.seek(0)
     return out.getvalue()
-
 
 st.title("📊 ระบบประมวลผลสถิตินิสิต")
 st.caption("รูปแบบการทำงาน: Upload Excel → กดประมวลผล → สถิติทั้งหมดอัปเดต")
