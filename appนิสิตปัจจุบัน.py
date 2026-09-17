@@ -6,31 +6,34 @@ import streamlit as st
 st.set_page_config(page_title="ระบบสถิตินิสิตบัณฑิตศึกษา", page_icon="📊", layout="wide")
 REQUIRED_COLUMNS = ["ปีที่เข้า", "ภาคการศึกษาที่เข้า", "รหัสนิสิต", "คณะ", "วิทยาเขต", "สาขา", "ระดับ", "รหัสสถานะนิสิต", "สถานะนิสิต", "ปีที่จบ", "เทอมที่จบ", "วันที่จบ"]
 STATUS_EXCLUDE = ["เสียชีวิต", "พ้นสภาพคืนไม่ได้", "ลาออก"]
-ON_TIME_STATUSES = ["สำเร็จการศึกษา", "นิสิตปัจจุบัน", "สภาพสมบูรณ์", "ลาพักการเรียน", "รักษาสภาพนิสิต"]
+
 
 def clean_text(x):
     if pd.isna(x): return ""
     return str(x).strip()
 
+
 def num(x):
     try: return float(x)
     except Exception: return None
+
 
 def calc_duration(row):
     """1 เทอม = 0.5 ปี; ภาคเดียวกันของปีเดียวกัน = 0.5 ปี"""
     y0, s0 = num(row.get("ปีที่เข้า")), num(row.get("ภาคการศึกษาที่เข้า"))
     y1, s1 = num(row.get("ปีที่จบ")), num(row.get("เทอมที่จบ"))
     if None in (y0, s0, y1, s1): return None
-    # นับภาคที่เข้าและภาคที่จบรวมกัน: เทอมเดียวกัน = 1 เทอม = 0.5 ปี
     semesters = (y1 - y0) * 2 + (s1 - s0) + 1
     d = semesters * 0.5
     return round(d, 1) if d > 0 else None
+
 
 def normalize_level(x):
     x = clean_text(x)
     if "เอก" in x: return "ป.เอก"
     if "โท" in x: return "ป.โท"
     return x or "ไม่ระบุ"
+
 
 def status_group(x):
     s = clean_text(x)
@@ -40,14 +43,17 @@ def status_group(x):
     if "ลาพัก" in s: return "ลาพักการเรียน"
     if "ลาออก" in s: return "ลาออก"
     if "เสียชีวิต" in s: return "พ้นสภาพ (เสียชีวิต)"
+    if "พ้นสภาพคืนไม่ได้" in s: return "พ้นสภาพคืนไม่ได้"
     if "พ้นสภาพ" in s: return "พ้นสภาพ"
     if "ปัจจุบัน" in s or "กำลังศึกษา" in s: return "นิสิตปัจจุบัน"
     return s or "ไม่ระบุ"
+
 
 def cut_plan_type(x):
     s = clean_text(x)
     if not s: return ""
     return re.split(r"\s*(?:แผน|แบบ)(?:\s|[:：\-/]|$).*$", s, maxsplit=1)[0].strip(" -:：/|")
+
 
 def read_excel(uploaded):
     df = pd.read_excel(uploaded, sheet_name="ข้อมูลนิสิต")
@@ -56,52 +62,80 @@ def read_excel(uploaded):
     if missing: raise ValueError("ไม่พบคอลัมน์ที่จำเป็น: " + ", ".join(missing))
     return df
 
+
 def metric_row(label, g, limit, durations):
     r = {"ปีที่เข้า": label, "จำนวนนิสิตรับเข้า(คน)": len(g)}
-    for d in durations: r[d] = int((g["ระยะเวลา(ปี)"] == d).sum())
+    for d in durations:
+        r[d] = int((g["ระยะเวลา(ปี)"] == d).sum())
+
     grads = g[g["สถานะกลุ่ม"] == "สำเร็จการศึกษา"]
     r["จำนวนนิสิตจบ_ทั้งหมด"] = len(grads)
     r["จำนวนนิสิตจบ_ตามหลักสูตร"] = int((grads["ระยะเวลา(ปี)"] <= limit).sum())
-    # %จบตามเวลา: ตัวตั้ง = คนที่จบตามเกณฑ์; ตัวหาร = 5 สถานะที่กำหนด
-    denominator = g[g["สถานะกลุ่ม"].isin(ON_TIME_STATUSES)]
-    r["%จบตามเวลา"] = r["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100 / len(denominator) if len(denominator) else 0
+
+    # กลุ่มสำหรับสถิติชุดนี้: ไม่นับ เสียชีวิต / พ้นสภาพคืนไม่ได้ / ลาออก
+    valid_status = ~g["สถานะกลุ่ม"].isin(STATUS_EXCLUDE)
+    valid = g[valid_status]
+    r["จำนวนนิสิตที่ไม่นับสถานะ"] = len(valid)
+
+    # เฉลี่ยระยะเวลา: ใช้เฉพาะรายการที่คำนวณระยะเวลาได้ และไม่นับ 3 สถานะที่กำหนด
+    valid_duration = valid["ระยะเวลา(ปี)"].dropna()
+    r["เฉลี่ยระยะเวลาที่ใช้(ปี) ไม่นับรวมนิสิตสถานะ เสียชีวิต พ้นสภาพคืนไม่ได้ ลาออก"] = (
+        round(valid_duration.mean(), 2) if len(valid_duration) else 0
+    )
+
+    # % จบตามเวลา = จบภายในเกณฑ์ / จำนวนนิสิตที่ไม่นับ 3 สถานะ
+    r["%จบตามเวลา"] = (
+        r["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100 / r["จำนวนนิสิตที่ไม่นับสถานะ"]
+        if r["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
+    )
+
     r["ยังไม่จบ_ทั้งหมด"] = len(g) - len(grads)
-    for stt in ["นิสิตปัจจุบัน", "สภาพสมบูรณ์", "พ้นสภาพ", "พ้นสภาพ (เสียชีวิต)", "รักษาสภาพนิสิต", "ลาพักการเรียน", "ลาออก"]:
+    for stt in ["นิสิตปัจจุบัน", "สภาพสมบูรณ์", "พ้นสภาพ", "พ้นสภาพ (เสียชีวิต)", "พ้นสภาพคืนไม่ได้", "รักษาสภาพนิสิต", "ลาพักการเรียน", "ลาออก"]:
         r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())
-    valid = g[~g["สถานะกลุ่ม"].isin(STATUS_EXCLUDE)]
-    r["เฉลี่ยระยะเวลา(ปี)"] = valid["ระยะเวลา(ปี)"].dropna().mean() if valid["ระยะเวลา(ปี)"].notna().any() else 0
     return r
+
 
 def build_stats(df):
     work = df.copy()
     work["ระดับ"] = work["ระดับ"].map(normalize_level)
     work["สถานะกลุ่ม"] = work["สถานะนิสิต"].map(status_group)
+
+    # ถ้าไม่ใช่ผู้สำเร็จการศึกษา ให้ล้างข้อมูลปี/เทอม/วันที่จบก่อนคำนวณระยะเวลา
     non_graduated = work["สถานะนิสิต"].map(clean_text) != "สำเร็จการศึกษา"
     work.loc[non_graduated, ["ปีที่จบ", "เทอมที่จบ", "วันที่จบ"]] = pd.NA
     work["ระยะเวลา(ปี)"] = work.apply(calc_duration, axis=1)
     work["สาขาสถิติ"] = work["สาขา"].map(cut_plan_type)
+
     durations = [x / 2 for x in range(1, 23)]
     rows = []
     levels = [x for x in ["ป.โท", "ป.เอก"] if x in work["ระดับ"].unique()]
     levels += [x for x in work["ระดับ"].unique() if x not in levels]
+
     for level in levels:
         g = work[work["ระดับ"] == level]
         if g.empty: continue
-        limit = 2 if level == "ป.โท" else 4
+
+        # เกณฑ์ตามระยะเวลาหลักสูตร: ป.โท 2 ปี / ป.เอก 3 ปี
+        limit = 2 if level == "ป.โท" else 3
         rows.append(metric_row(level, g, limit, durations))
+
         years = sorted(pd.to_numeric(g["ปีที่เข้า"], errors="coerce").dropna().unique())
         for year in years:
             gy = g[pd.to_numeric(g["ปีที่เข้า"], errors="coerce") == year]
             rows.append(metric_row(int(year), gy, limit, durations))
+
             for faculty, gf in gy.groupby("คณะ", dropna=False, sort=True):
                 faculty = clean_text(faculty)
                 if not faculty: continue
                 rows.append(metric_row("คณะ: " + faculty, gf, limit, durations))
+
                 for program, gp in gf.groupby("สาขาสถิติ", dropna=False, sort=True):
                     program = clean_text(program)
                     if not program: continue
                     rows.append(metric_row("  └ " + program, gp, limit, durations))
+
     return work, pd.DataFrame(rows)
+
 
 def make_excel(original, processed, stats):
     out = io.BytesIO()
@@ -119,9 +153,11 @@ def make_excel(original, processed, stats):
     out.seek(0)
     return out.getvalue()
 
+
 st.title("📊 ระบบประมวลผลสถิตินิสิต")
 st.caption("รูปแบบการทำงาน: Upload Excel → กดประมวลผล → สถิติทั้งหมดอัปเดต")
 uploaded = st.file_uploader("1) อัปโหลดไฟล์ Excel", type=["xlsx", "xls"], help="ไฟล์ควรมีชีตชื่อ 'ข้อมูลนิสิต'")
+
 if uploaded:
     try:
         df = read_excel(uploaded)
@@ -131,7 +167,9 @@ if uploaded:
         c2.metric("ป.โท", f"{(df['ระดับ'].map(normalize_level) == 'ป.โท').sum():,}")
         c3.metric("ป.เอก", f"{(df['ระดับ'].map(normalize_level) == 'ป.เอก').sum():,}")
         c4.metric("ปีที่เข้า", f"{df['ปีที่เข้า'].nunique():,}")
-        with st.expander("ดูตัวอย่างข้อมูลที่นำเข้า"): st.dataframe(df.head(20), use_container_width=True)
+        with st.expander("ดูตัวอย่างข้อมูลที่นำเข้า"):
+            st.dataframe(df.head(20), use_container_width=True)
+
         if st.button("🚀 2) ประมวลผลและอัปเดตสถิติ", type="primary", use_container_width=True):
             with st.spinner("กำลังประมวลผลข้อมูลและสร้างสถิติ..."):
                 processed, stats = build_stats(df)
@@ -142,6 +180,7 @@ if uploaded:
             st.success("ประมวลผลเสร็จแล้ว — สถิติอัปเดตเรียบร้อย")
     except Exception as e:
         st.error(f"ไม่สามารถอ่านไฟล์ได้: {e}")
+
 if "stats" in st.session_state:
     stats = st.session_state["stats"]
     processed = st.session_state["processed"]
