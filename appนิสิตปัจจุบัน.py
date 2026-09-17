@@ -4,28 +4,27 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(page_title="ระบบสถิตินิสิตบัณฑิตศึกษา", page_icon="📊", layout="wide")
-
 REQUIRED_COLUMNS = ["ปีที่เข้า", "ภาคการศึกษาที่เข้า", "รหัสนิสิต", "คณะ", "วิทยาเขต", "สาขา", "ระดับ", "รหัสสถานะนิสิต", "สถานะนิสิต", "ปีที่จบ", "เทอมที่จบ", "วันที่จบ"]
 STATUS_EXCLUDE = ["เสียชีวิต", "พ้นสภาพคืนไม่ได้", "ลาออก"]
-
+ON_TIME_STATUSES = ["สำเร็จการศึกษา", "นิสิตปัจจุบัน", "สภาพสมบูรณ์", "ลาพักการเรียน", "รักษาสภาพนิสิต"]
 
 def clean_text(x):
     if pd.isna(x): return ""
     return str(x).strip()
 
-
 def num(x):
     try: return float(x)
     except Exception: return None
 
-
 def calc_duration(row):
+    """1 เทอม = 0.5 ปี; ภาคเดียวกันของปีเดียวกัน = 0.5 ปี"""
     y0, s0 = num(row.get("ปีที่เข้า")), num(row.get("ภาคการศึกษาที่เข้า"))
     y1, s1 = num(row.get("ปีที่จบ")), num(row.get("เทอมที่จบ"))
     if None in (y0, s0, y1, s1): return None
-    d = (y1 - y0) + (s1 - s0) * 0.5
-    return round(d, 1) if d >= 0 else None
-
+    # นับภาคที่เข้าและภาคที่จบรวมกัน: เทอมเดียวกัน = 1 เทอม = 0.5 ปี
+    semesters = (y1 - y0) * 2 + (s1 - s0) + 1
+    d = semesters * 0.5
+    return round(d, 1) if d > 0 else None
 
 def normalize_level(x):
     x = clean_text(x)
@@ -33,10 +32,10 @@ def normalize_level(x):
     if "โท" in x: return "ป.โท"
     return x or "ไม่ระบุ"
 
-
 def status_group(x):
     s = clean_text(x)
     if "สำเร็จการศึกษา" in s: return "สำเร็จการศึกษา"
+    if "สภาพสมบูรณ์" in s: return "สภาพสมบูรณ์"
     if "รักษาสภาพ" in s: return "รักษาสภาพนิสิต"
     if "ลาพัก" in s: return "ลาพักการเรียน"
     if "ลาออก" in s: return "ลาออก"
@@ -45,13 +44,10 @@ def status_group(x):
     if "ปัจจุบัน" in s or "กำลังศึกษา" in s: return "นิสิตปัจจุบัน"
     return s or "ไม่ระบุ"
 
-
 def cut_plan_type(x):
-    """คืนชื่อสาขาหลักที่ไม่มีคำว่า แผน/แบบ และข้อความที่ตามหลัง"""
     s = clean_text(x)
     if not s: return ""
     return re.split(r"\s*(?:แผน|แบบ)(?:\s|[:：\-/]|$).*$", s, maxsplit=1)[0].strip(" -:：/|")
-
 
 def read_excel(uploaded):
     df = pd.read_excel(uploaded, sheet_name="ข้อมูลนิสิต")
@@ -60,47 +56,39 @@ def read_excel(uploaded):
     if missing: raise ValueError("ไม่พบคอลัมน์ที่จำเป็น: " + ", ".join(missing))
     return df
 
-
 def metric_row(label, g, limit, durations):
     r = {"ปีที่เข้า": label, "จำนวนนิสิตรับเข้า(คน)": len(g)}
     for d in durations: r[d] = int((g["ระยะเวลา(ปี)"] == d).sum())
     grads = g[g["สถานะกลุ่ม"] == "สำเร็จการศึกษา"]
     r["จำนวนนิสิตจบ_ทั้งหมด"] = len(grads)
     r["จำนวนนิสิตจบ_ตามหลักสูตร"] = int((grads["ระยะเวลา(ปี)"] <= limit).sum())
-    r["%จบตามเวลา"] = r["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100 / len(g) if len(g) else 0
+    # %จบตามเวลา: ตัวตั้ง = คนที่จบตามเกณฑ์; ตัวหาร = 5 สถานะที่กำหนด
+    denominator = g[g["สถานะกลุ่ม"].isin(ON_TIME_STATUSES)]
+    r["%จบตามเวลา"] = r["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100 / len(denominator) if len(denominator) else 0
     r["ยังไม่จบ_ทั้งหมด"] = len(g) - len(grads)
-    for stt in ["นิสิตปัจจุบัน", "พ้นสภาพ", "พ้นสภาพ (เสียชีวิต)", "รักษาสภาพนิสิต", "ลาพักการเรียน", "ลาออก"]:
+    for stt in ["นิสิตปัจจุบัน", "สภาพสมบูรณ์", "พ้นสภาพ", "พ้นสภาพ (เสียชีวิต)", "รักษาสภาพนิสิต", "ลาพักการเรียน", "ลาออก"]:
         r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())
     valid = g[~g["สถานะกลุ่ม"].isin(STATUS_EXCLUDE)]
     r["เฉลี่ยระยะเวลา(ปี)"] = valid["ระยะเวลา(ปี)"].dropna().mean() if valid["ระยะเวลา(ปี)"].notna().any() else 0
     return r
 
-
 def build_stats(df):
     work = df.copy()
     work["ระดับ"] = work["ระดับ"].map(normalize_level)
     work["สถานะกลุ่ม"] = work["สถานะนิสิต"].map(status_group)
-
-    # เฉพาะผู้สำเร็จการศึกษาเท่านั้นที่มีข้อมูลจบ
     non_graduated = work["สถานะนิสิต"].map(clean_text) != "สำเร็จการศึกษา"
     work.loc[non_graduated, ["ปีที่จบ", "เทอมที่จบ", "วันที่จบ"]] = pd.NA
     work["ระยะเวลา(ปี)"] = work.apply(calc_duration, axis=1)
-
-    # ชื่อสาขาสำหรับสถิติ = ชื่อสาขาหลักที่ไม่มี "แผน" หรือ "แบบ"
-    # ตัวอย่าง: "การจัดการ แผน ก" และ "การจัดการ แบบ 1" จะถูกรวมเป็น "การจัดการ"
     work["สาขาสถิติ"] = work["สาขา"].map(cut_plan_type)
-
     durations = [x / 2 for x in range(1, 23)]
     rows = []
     levels = [x for x in ["ป.โท", "ป.เอก"] if x in work["ระดับ"].unique()]
     levels += [x for x in work["ระดับ"].unique() if x not in levels]
-
     for level in levels:
         g = work[work["ระดับ"] == level]
         if g.empty: continue
         limit = 2 if level == "ป.โท" else 4
         rows.append(metric_row(level, g, limit, durations))
-
         years = sorted(pd.to_numeric(g["ปีที่เข้า"], errors="coerce").dropna().unique())
         for year in years:
             gy = g[pd.to_numeric(g["ปีที่เข้า"], errors="coerce") == year]
@@ -109,16 +97,11 @@ def build_stats(df):
                 faculty = clean_text(faculty)
                 if not faculty: continue
                 rows.append(metric_row("คณะ: " + faculty, gf, limit, durations))
-
-                # สำคัญ: ตอนทำสถิติใช้ "สาขาสถิติ" ซึ่งเป็นชื่อสาขาที่ไม่มีแผน/แบบ
-                # ไม่ใช้ข้อความในคอลัมน์สาขาเดิมที่มี แผน ก / แผน ข / แบบ ฯลฯ
                 for program, gp in gf.groupby("สาขาสถิติ", dropna=False, sort=True):
                     program = clean_text(program)
                     if not program: continue
                     rows.append(metric_row("  └ " + program, gp, limit, durations))
-
     return work, pd.DataFrame(rows)
-
 
 def make_excel(original, processed, stats):
     out = io.BytesIO()
@@ -136,11 +119,9 @@ def make_excel(original, processed, stats):
     out.seek(0)
     return out.getvalue()
 
-
 st.title("📊 ระบบประมวลผลสถิตินิสิต")
 st.caption("รูปแบบการทำงาน: Upload Excel → กดประมวลผล → สถิติทั้งหมดอัปเดต")
 uploaded = st.file_uploader("1) อัปโหลดไฟล์ Excel", type=["xlsx", "xls"], help="ไฟล์ควรมีชีตชื่อ 'ข้อมูลนิสิต'")
-
 if uploaded:
     try:
         df = read_excel(uploaded)
@@ -161,7 +142,6 @@ if uploaded:
             st.success("ประมวลผลเสร็จแล้ว — สถิติอัปเดตเรียบร้อย")
     except Exception as e:
         st.error(f"ไม่สามารถอ่านไฟล์ได้: {e}")
-
 if "stats" in st.session_state:
     stats = st.session_state["stats"]
     processed = st.session_state["processed"]
