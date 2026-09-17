@@ -75,6 +75,12 @@ def build_stats(df):
     work = df.copy()
     work["ระดับ"] = work["ระดับ"].map(normalize_level)
     work["สถานะกลุ่ม"] = work["สถานะนิสิต"].map(status_group)
+
+    # กฎข้อมูลจบ: เฉพาะผู้ที่มีสถานะ "สำเร็จการศึกษา" เท่านั้น
+    # ที่จะเก็บ ปีที่จบ / เทอมที่จบ / วันที่จบ
+    non_graduated = work["สถานะนิสิต"].map(clean_text) != "สำเร็จการศึกษา"
+    work.loc[non_graduated, ["ปีที่จบ", "เทอมที่จบ", "วันที่จบ"]] = pd.NA
+
     work["ระยะเวลา(ปี)"] = work.apply(calc_duration, axis=1)
 
     durations = [x / 2 for x in range(1, 23)]
