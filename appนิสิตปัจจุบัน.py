@@ -6,6 +6,7 @@ import streamlit as st
 st.set_page_config(page_title="ระบบสถิตินิสิตบัณฑิตศึกษา", page_icon="📊", layout="wide")
 REQUIRED_COLUMNS = ["ปีที่เข้า", "ภาคการศึกษาที่เข้า", "รหัสนิสิต", "คณะ", "วิทยาเขต", "สาขา", "ระดับ", "รหัสสถานะนิสิต", "สถานะนิสิต", "ปีที่จบ", "เทอมที่จบ", "วันที่จบ"]
 STATUS_EXCLUDE = ["เสียชีวิต", "พ้นสภาพคืนไม่ได้", "ลาออก"]
+STATUS_EXCLUDE_GROUP = ["พ้นสภาพ (เสียชีวิต)", "พ้นสภาพคืนไม่ได้", "ลาออก"]
 
 
 def clean_text(x):
@@ -64,31 +65,25 @@ def read_excel(uploaded):
 
 
 def metric_row(label, g, limit, durations):
-    r = {"ปีที่เข้า": label, "จำนวนนิสิตรับเข้า(คน)": len(g)}
+    r = {"ปีที่เข้า": label}
+
+    # ไม่นับ 3 สถานะ: เสียชีวิต / พ้นสภาพคืนไม่ได้ / ลาออก
+    valid = g[~g["สถานะกลุ่ม"].isin(STATUS_EXCLUDE_GROUP)]
+    valid_duration = valid["ระยะเวลา(ปี)"].dropna()
+    r["เฉลี่ยระยะเวลาที่ใช้(ปี) ไม่นับรวมนิสิตสถานะ เสียชีวิต พ้นสภาพคืนไม่ได้ ลาออก"] = round(valid_duration.mean(), 2) if len(valid_duration) else 0
+    r["จำนวนนิสิตที่ไม่นับสถานะ เสียชีวิต พ้นสภาพคืนไม่ได้ ลาออก"] = len(valid)
+
+    # จบตามระยะเวลาหลักสูตร: ป.โท 2 ปี / ป.เอก 3 ปี
+    grads = g[g["สถานะกลุ่ม"] == "สำเร็จการศึกษา"]
+    r["ตามระยะเวลาของหลักสูตร 2 ปี/ 3 ปี (คน)"] = int((grads["ระยะเวลา(ปี)"].notna() & (grads["ระยะเวลา(ปี)"] <= limit)).sum())
+    r["% จบตามเวลา"] = r["ตามระยะเวลาของหลักสูตร 2 ปี/ 3 ปี (คน)"] * 100 / len(valid) if len(valid) else 0
+
+    # คอลัมน์สถิติเดิม
+    r["จำนวนนิสิตรับเข้า(คน)"] = len(g)
     for d in durations:
         r[d] = int((g["ระยะเวลา(ปี)"] == d).sum())
-
-    grads = g[g["สถานะกลุ่ม"] == "สำเร็จการศึกษา"]
     r["จำนวนนิสิตจบ_ทั้งหมด"] = len(grads)
-    r["จำนวนนิสิตจบ_ตามหลักสูตร"] = int((grads["ระยะเวลา(ปี)"] <= limit).sum())
-
-    # กลุ่มสำหรับสถิติชุดนี้: ไม่นับ เสียชีวิต / พ้นสภาพคืนไม่ได้ / ลาออก
-    valid_status = ~g["สถานะกลุ่ม"].isin(STATUS_EXCLUDE)
-    valid = g[valid_status]
-    r["จำนวนนิสิตที่ไม่นับสถานะ"] = len(valid)
-
-    # เฉลี่ยระยะเวลา: ใช้เฉพาะรายการที่คำนวณระยะเวลาได้ และไม่นับ 3 สถานะที่กำหนด
-    valid_duration = valid["ระยะเวลา(ปี)"].dropna()
-    r["เฉลี่ยระยะเวลาที่ใช้(ปี) ไม่นับรวมนิสิตสถานะ เสียชีวิต พ้นสภาพคืนไม่ได้ ลาออก"] = (
-        round(valid_duration.mean(), 2) if len(valid_duration) else 0
-    )
-
-    # % จบตามเวลา = จบภายในเกณฑ์ / จำนวนนิสิตที่ไม่นับ 3 สถานะ
-    r["%จบตามเวลา"] = (
-        r["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100 / r["จำนวนนิสิตที่ไม่นับสถานะ"]
-        if r["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
-    )
-
+    r["จำนวนนิสิตจบ_ตามหลักสูตร"] = r["ตามระยะเวลาของหลักสูตร 2 ปี/ 3 ปี (คน)"]
     r["ยังไม่จบ_ทั้งหมด"] = len(g) - len(grads)
     for stt in ["นิสิตปัจจุบัน", "สภาพสมบูรณ์", "พ้นสภาพ", "พ้นสภาพ (เสียชีวิต)", "พ้นสภาพคืนไม่ได้", "รักษาสภาพนิสิต", "ลาพักการเรียน", "ลาออก"]:
         r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())
@@ -114,8 +109,6 @@ def build_stats(df):
     for level in levels:
         g = work[work["ระดับ"] == level]
         if g.empty: continue
-
-        # เกณฑ์ตามระยะเวลาหลักสูตร: ป.โท 2 ปี / ป.เอก 3 ปี
         limit = 2 if level == "ป.โท" else 3
         rows.append(metric_row(level, g, limit, durations))
 
@@ -123,17 +116,14 @@ def build_stats(df):
         for year in years:
             gy = g[pd.to_numeric(g["ปีที่เข้า"], errors="coerce") == year]
             rows.append(metric_row(int(year), gy, limit, durations))
-
             for faculty, gf in gy.groupby("คณะ", dropna=False, sort=True):
                 faculty = clean_text(faculty)
                 if not faculty: continue
                 rows.append(metric_row("คณะ: " + faculty, gf, limit, durations))
-
                 for program, gp in gf.groupby("สาขาสถิติ", dropna=False, sort=True):
                     program = clean_text(program)
                     if not program: continue
                     rows.append(metric_row("  └ " + program, gp, limit, durations))
-
     return work, pd.DataFrame(rows)
 
 
@@ -169,7 +159,6 @@ if uploaded:
         c4.metric("ปีที่เข้า", f"{df['ปีที่เข้า'].nunique():,}")
         with st.expander("ดูตัวอย่างข้อมูลที่นำเข้า"):
             st.dataframe(df.head(20), use_container_width=True)
-
         if st.button("🚀 2) ประมวลผลและอัปเดตสถิติ", type="primary", use_container_width=True):
             with st.spinner("กำลังประมวลผลข้อมูลและสร้างสถิติ..."):
                 processed, stats = build_stats(df)
