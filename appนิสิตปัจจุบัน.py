@@ -47,10 +47,9 @@ def status_group(x):
 
 
 def cut_plan_type(x):
-    """ตัดคำว่า แผน หรือ แบบ และข้อความ/ค่าที่ตามหลังออกจากชื่อสาขา"""
+    """คืนชื่อสาขาหลักที่ไม่มีคำว่า แผน/แบบ และข้อความที่ตามหลัง"""
     s = clean_text(x)
     if not s: return ""
-    # รองรับ เช่น แผน ก, แผน ข, แผน 1, แบบ ก, แบบ 1 รวมถึงรูปแบบมี : - /
     return re.split(r"\s*(?:แผน|แบบ)(?:\s|[:：\-/]|$).*$", s, maxsplit=1)[0].strip(" -:：/|")
 
 
@@ -87,8 +86,9 @@ def build_stats(df):
     work.loc[non_graduated, ["ปีที่จบ", "เทอมที่จบ", "วันที่จบ"]] = pd.NA
     work["ระยะเวลา(ปี)"] = work.apply(calc_duration, axis=1)
 
-    # สร้างคอลัมน์สำหรับสถิติ โดยตัดทั้ง "แผน" และ "แบบ" ออกจากชื่อสาขา
-    work["สาขา_ตัดแผน"] = work["สาขา"].map(cut_plan_type)
+    # ชื่อสาขาสำหรับสถิติ = ชื่อสาขาหลักที่ไม่มี "แผน" หรือ "แบบ"
+    # ตัวอย่าง: "การจัดการ แผน ก" และ "การจัดการ แบบ 1" จะถูกรวมเป็น "การจัดการ"
+    work["สาขาสถิติ"] = work["สาขา"].map(cut_plan_type)
 
     durations = [x / 2 for x in range(1, 23)]
     rows = []
@@ -109,8 +109,10 @@ def build_stats(df):
                 faculty = clean_text(faculty)
                 if not faculty: continue
                 rows.append(metric_row("คณะ: " + faculty, gf, limit, durations))
-                # สำคัญ: ใช้สาขา_ตัดแผน ไม่ใช้สาขาเดิม เพื่อไม่ให้ แผน/แบบ แยกเป็นหลายรายการ
-                for program, gp in gf.groupby("สาขา_ตัดแผน", dropna=False, sort=True):
+
+                # สำคัญ: ตอนทำสถิติใช้ "สาขาสถิติ" ซึ่งเป็นชื่อสาขาที่ไม่มีแผน/แบบ
+                # ไม่ใช้ข้อความในคอลัมน์สาขาเดิมที่มี แผน ก / แผน ข / แบบ ฯลฯ
+                for program, gp in gf.groupby("สาขาสถิติ", dropna=False, sort=True):
                     program = clean_text(program)
                     if not program: continue
                     rows.append(metric_row("  └ " + program, gp, limit, durations))
