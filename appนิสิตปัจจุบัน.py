@@ -648,17 +648,19 @@ def make_excel(original_uploaded, original, processed, stats):
         copied = source_stats.loc[keep].copy().reset_index(drop=True)
 
         old_rows = sws.max_row
-        for rr in range(5, old_rows + 1):
+        # ข้อมูลของชีทสถิติเริ่มที่แถว 4 จึงต้องเขียนทับตั้งแต่แถว 4
+        # เพื่อไม่ให้แถว ป.โท / ป.เอก จากชีทต้นแบบซ้ำกับข้อมูลที่คัดลอก
+        for rr in range(4, old_rows + 1):
             for cc in range(1, 41):
                 sws.cell(rr, cc).value = None
                 # ล้างสีของแถวว่างด้านล่างทั้งหมด
                 sws.cell(rr, cc).fill = PatternFill(fill_type=None)
 
-        needed = 5 + len(copied) - 1
+        needed = 4 + len(copied) - 1
         if needed > old_rows:
             sws.insert_rows(old_rows + 1, needed - old_rows)
 
-        for i, (_, row) in enumerate(copied.iterrows(), start=5):
+        for i, (_, row) in enumerate(copied.iterrows(), start=4):
             label = clean_text(row["ปีที่เข้า"])
 
             if label in ("ป.โท", "ป.เอก"):
@@ -699,7 +701,7 @@ def make_excel(original_uploaded, original, processed, stats):
             sws.cell(i, 37).number_format = "0.00"
             sws.cell(i, 40).number_format = "0.00"
 
-        sws.freeze_panes = "A5"
+        sws.freeze_panes = "A4"
         sws.sheet_view.showGridLines = False
         if len(copied):
             sws.auto_filter.ref = f"A4:AN{needed}"
