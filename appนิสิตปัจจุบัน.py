@@ -258,6 +258,26 @@ def build_stats(df):
                         continue
                     rows.append(metric_row(program, gp, limit, durations))
 
+    # แถวล่างสุด "รวมทั้งหมด" รวมข้อมูลทุกระดับ/ทุกปี
+    if rows:
+        all_g = work.copy()
+        total = metric_row("รวมทั้งหมด", all_g, 2, durations)
+
+        # ผู้สำเร็จการศึกษาตามหลักสูตร: ป.โท <= 2 ปี และ ป.เอก <= 4 ปี
+        grads_all = all_g[all_g["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"].copy()
+        if "รหัสนิสิต" in grads_all.columns:
+            total["จำนวนนิสิตจบ_ทั้งหมด"] = grads_all["รหัสนิสิต"].map(clean_text).replace("", pd.NA).dropna().nunique()
+            on_time = (
+                ((grads_all["ระดับ"] == "ป.โท") & (grads_all["ระยะเวลา(ปี)"] <= 2))
+                | ((grads_all["ระดับ"] == "ป.เอก") & (grads_all["ระยะเวลา(ปี)"] <= 4))
+            )
+            total["จำนวนนิสิตจบ_ตามหลักสูตร"] = grads_all.loc[on_time, "รหัสนิสิต"].map(clean_text).replace("", pd.NA).dropna().nunique()
+        total["%จบตามเวลา"] = (
+            total["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100 / total["จำนวนนิสิตที่ไม่นับสถานะ"]
+            if total["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
+        )
+        rows.append(total)
+
     # 40 คอลัมน์ตรงกับ Sheet "สถิติ" เดิม
     # ใช้ชื่อภายในที่ไม่ซ้ำกันสำหรับ % เดิม เพื่อป้องกัน pyarrow/Streamlit
     columns = ["ปีที่เข้า", "จำนวนนิสิตรับเข้า(คน)"] + durations + [
