@@ -163,14 +163,12 @@ def metric_row(label, g, limit, durations):
     # สถิติ 4 ช่องใหม่
     # สูตรที่กำหนด:
     # จำนวนนิสิตที่ไม่นับสถานะ
-    # = จำนวนนิสิตรับเข้า - พ้นสภาพ(เสียชีวิต) - พ้นสภาพ - ลาออก
-    # "ลาออก" ให้นับสถานะที่มีคำว่า "ลาออก" ในข้อมูลดิบด้วย
-    # รวม 37.3/38.3 ที่แสดงผลเป็น "พ้นสภาพ (คณบดีอนุมัติ)"
-    raw_status = g["สถานะนิสิต"].map(clean_text)
+    # = จำนวนนิสิตรับเข้า - พ้นสภาพ(เสียชีวิต) - พ้นสภาพ - ลาออก - พ้นสภาพ (คณบดีอนุมัติ)
     death_mask = g["สถานะกลุ่ม"] == "พ้นสภาพ (เสียชีวิต)"
     dropout_mask = g["สถานะกลุ่ม"] == "พ้นสภาพ"
-    resign_mask = raw_status.str.contains("ลาออก", na=False)
-    excluded_mask = death_mask | dropout_mask | resign_mask
+    resign_mask = g["สถานะกลุ่ม"] == "ลาออก"
+    dean_mask = g["สถานะกลุ่ม"] == "พ้นสภาพ (คณบดีอนุมัติ)"
+    excluded_mask = death_mask | dropout_mask | resign_mask | dean_mask
     excluded_count = int(excluded_mask.sum())
     r["จำนวนนิสิตที่ไม่นับสถานะ"] = len(g) - excluded_count
     valid = g[~excluded_mask]
