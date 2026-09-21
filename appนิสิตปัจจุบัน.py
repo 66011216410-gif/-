@@ -735,17 +735,71 @@ if uploaded:
         df = read_excel(uploaded)
         st.success(f"อ่านข้อมูลสำเร็จ: {len(df):,} รายการ")
 
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("นิสิตทั้งหมด", f"{len(df):,}")
-        c2.metric(
-            "ป.โท",
-            f"{(df['ระดับ'].map(normalize_level) == 'ป.โท').sum():,}",
+        # ============================================================
+        # DASHBOARD — ข้อมูลนิสิตปัจจุบัน
+        # ============================================================
+        current_df = df[
+            df["สถานะนิสิต"].astype(str).str.strip()
+            == "นิสิตปัจจุบัน สภาพสมบูรณ์"
+        ].copy()
+
+        level_norm = current_df["ระดับ"].map(normalize_level)
+        master_count = int((level_norm == "ป.โท").sum())
+        doctoral_count = int((level_norm == "ป.เอก").sum())
+
+        thai_count = int(
+            (current_df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ไทย").sum()
         )
-        c3.metric(
-            "ป.เอก",
-            f"{(df['ระดับ'].map(normalize_level) == 'ป.เอก').sum():,}",
+        foreign_count = int(
+            (current_df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ต่างชาติ").sum()
         )
-        c4.metric("ปีที่เข้า", f"{df['ปีที่เข้า'].nunique():,}")
+
+        st.markdown(
+            """
+            <style>
+            .dashboard-box {
+                background: #f3f7fc;
+                padding: 18px 10px 22px 10px;
+                margin-bottom: 18px;
+            }
+            .dashboard-number {
+                color: #0b2a4a;
+                font-size: 42px;
+                font-weight: 700;
+                text-align: center;
+                line-height: 1.1;
+            }
+            .dashboard-label {
+                color: #0b2a4a;
+                font-size: 16px;
+                text-align: center;
+                line-height: 1.7;
+                margin-top: 18px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        d1, d2, d3, d4 = st.columns(4)
+        dashboard_items = [
+            (master_count, "จำนวนนิสิต<br>ระดับปริญญาโท"),
+            (doctoral_count, "จำนวนนิสิต<br>ระดับปริญญาเอก"),
+            (thai_count, "จำนวนนิสิต<br>ไทยทั้งหมด"),
+            (foreign_count, "จำนวนนิสิต<br>ต่างชาติทั้งหมด"),
+        ]
+
+        for col, (value, label) in zip((d1, d2, d3, d4), dashboard_items):
+            with col:
+                st.markdown(
+                    f'''
+                    <div class="dashboard-box">
+                        <div class="dashboard-number">{value:,}</div>
+                        <div class="dashboard-label">{label}</div>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True,
+                )
 
         with st.expander("ดูตัวอย่างข้อมูลที่นำเข้า"):
             st.dataframe(df.head(20), use_container_width=True)
