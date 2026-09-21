@@ -617,207 +617,64 @@ def make_excel(original_uploaded, original, processed, stats):
         ws.auto_filter.ref = f"A3:AN{needed_last}"
 
     # ============================================================
-    # เพิ่ม Sheet สเกลคณะ และ Sheet สเกลปี
-    # ใช้โครงสร้างเดียวกับ Sheet "สถิติ" แต่สรุปคนละมิติ
+    # สร้าง Sheet "คณะ" และ "ปี" จาก Sheet "สถิติ" โดยตรง
+    # ไม่คำนวณสถิติใหม่: ใช้ค่าจาก stats ที่คำนวณเสร็จแล้วทั้งหมด
+    #
+    # คณะ = คัดลอกสถิติ แล้วลบแถวระดับสาขาออก
+    # ปี   = คัดลอกสถิติ แล้วลบแถวคณะและสาขาออก
     # ============================================================
-    def build_aggregate_stats(group_col):
-        agg_rows = []
-
-        # แยก ป.โท / ป.เอก ภายในแต่ละคณะหรือปี
-        grouped = processed.groupby(
-            [group_col, "ระดับ"], dropna=False, sort=True
-        )
-
-        for (key, level), group in grouped:
-            label = clean_text(key)
-            if not label:
-                continue
-            label = f"{label} - {level}"
-
-            limit = 2 if level == "ป.โท" else 4
-            rr = metric_row(label, group, limit, durations)
-            agg_rows.append(rr)
-
-        # แถวรวมของแต่ละระดับ
-        for level, group in processed.groupby("ระดับ", dropna=False, sort=True):
-            level = clean_text(level)
-            if not level:
-                continue
-
-            limit = 2 if level == "ป.โท" else 4
-            rr = metric_row(f"รวมทั้งหมด - {level}", group, limit, durations)
-
-            grads_g = group[
-                group["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"
-            ].copy()
-            if "รหัสนิสิต" in grads_g.columns:
-                rr["จำนวนนิสิตจบ_ทั้งหมด"] = (
-                    grads_g["รหัสนิสิต"].map(clean_text)
-                    .replace("", pd.NA).dropna().nunique()
-                )
-                rr["จำนวนนิสิตจบ_ตามหลักสูตร"] = (
-                    grads_g.loc[
-                        grads_g["ระยะเวลา(ปี)"] <= limit, "รหัสนิสิต"
-                    ].map(clean_text).replace("", pd.NA).dropna().nunique()
-                )
-                rr["%จบตามเวลา"] = (
-                    rr["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100
-                    / rr["จำนวนนิสิตที่ไม่นับสถานะ"]
-                    if rr["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
-                )
-            agg_rows.append(rr)
-
-        # รวมทั้งหมดทุกระดับ
-        total = metric_row("รวมทั้งหมด", processed, 2, durations)
-        grads_all = processed[
-            processed["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"
-        ].copy()
-        if "รหัสนิสิต" in grads_all.columns:
-            total["จำนวนนิสิตจบ_ทั้งหมด"] = (
-                grads_all["รหัสนิสิต"].map(clean_text)
-                .replace("", pd.NA).dropna().nunique()
-            )
-            on_time = (
-                ((grads_all["ระดับ"] == "ป.โท") & (grads_all["ระยะเวลา(ปี)"] <= 2))
-                | ((grads_all["ระดับ"] == "ป.เอก") & (grads_all["ระยะเวลา(ปี)"] <= 4))
-            )
-            total["จำนวนนิสิตจบ_ตามหลักสูตร"] = (
-                grads_all.loc[on_time, "รหัสนิสิต"]
-                .map(clean_text).replace("", pd.NA).dropna().nunique()
-            )
-            total["%จบตามเวลา"] = (
-                total["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100
-                / total["จำนวนนิสิตที่ไม่นับสถานะ"]
-                if total["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
-            )
-        agg_rows.append(total)
-
-        return pd.DataFrame(agg_rows, columns=stats.columns)
-
-    def write_scale_sheet(sheet_name, aggregate_df):
+    def write_copied_stats_sheet(sheet_name, source_stats, mode):
         if sheet_name in wb.sheetnames:
             del wb[sheet_name]
 
         sws = wb.copy_worksheet(ws)
         sws.title = sheet_name
 
-        old_rows = sws.max_row
-        for rr in range(4, old_rows + 1):
-            for cc in range(1, 41):
-                sws.cell(rr, cc).value = None
+        labels = source_stats["ปีที่เข้า"].map(clean_text)
 
-        needed = 4 + len(aggregate_df) - 1
-        if needed > old_rows:
-            sws.insert_rows(old_rows + 1, needed - old_rows)
+        # แถวที่ต้องเก็บจาก Sheet "สถิติ"
+        is_level = labels.isin(["ป.โท", "ป.เอก"])
+        is_year = labels.str.fullmatch(r"\\d{4}", na=False)
+        is_faculty = labels.str.startswith("คณะ", na=False)
+        is_total = labels == "รวมทั้งหมด"
 
-        for i, (_, row) in enumerate(aggregate_df.iterrows(), start=4):
-            label = clean_text(row.iloc[0])
-            row_fill = pink_fill if label not in ("รวมทั้งหมด", "รวมทั้งหมด - ป.โท", "รวมทั้งหมด - ป.เอก") else gray
+        if mode == "faculty":
+            # ป.โท -> ปี -> คณะ และ ป.เอก -> ปี -> คณะ
+            keep = is_level | is_year | is_faculty | is_total
+        else:
+            # ป.โท -> ปี และ ป.เอก -> ปี
+            keep = is_level | is_year | is_total
 
-            for c in range(1, 41):
-                cell = sws.cell(i, c)
-                value = row.iloc[c - 1]
-                cell.value = value if pd.notna(value) else None
-                cell.fill = row_fill
-                cell.font = black_font if row_fill != gray else white_font
-                cell.alignment = center
-                cell.border = border
-
-            # ยืนยันการเขียน AL:AN จากชื่อคอลัมน์โดยตรง
-            sws.cell(i, 38).value = row["จำนวนนิสิตที่ไม่นับสถานะ เสียชีวิต พ้นสภาพ ลาออก พ้นสภาพ (คณบดีอนุมัติ)"]
-            sws.cell(i, 39).value = row["จำนวนนิสิตจบ_ตามหลักสูตร"]
-            sws.cell(i, 40).value = row["%จบตามเวลา"]
-
-            sws.cell(i, 36).number_format = "0.00"
-            sws.cell(i, 37).number_format = "0.00"
-            sws.cell(i, 40).number_format = "0.00"
-
-        sws.freeze_panes = "A4"
-        sws.sheet_view.showGridLines = False
-        if len(aggregate_df):
-            sws.auto_filter.ref = f"A3:AN{needed}"
-
-    # รวม ป.โท และ ป.เอก ไว้ใน Sheet เดียวกัน
-    # มี 2 Sheet: "คณะ" และ "ปี"
-    # โครงสร้าง Sheet คณะ: ป.โท -> ปี -> คณะ -> ป.เอก -> ปี -> คณะ
-    # โครงสร้าง Sheet ปี: ป.โท -> ปี -> ป.เอก -> ปี
-    def build_combined_stats(group_col=None):
-        result = []
-
-        for level_name, level_value in [("ป.โท", "ป.โท"), ("ป.เอก", "ป.เอก")]:
-            level_data = processed[processed["ระดับ"] == level_value].copy()
-            if level_data.empty:
-                continue
-
-            limit = 2 if level_name == "ป.โท" else 4
-            result.append(metric_row(level_name, level_data, limit, durations))
-
-            years = sorted(
-                pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce").dropna().unique()
-            )
-            for year in years:
-                gy = level_data[
-                    pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce") == year
-                ]
-                result.append(metric_row(int(year), gy, limit, durations))
-
-                if group_col is not None:
-                    for key, group in gy.groupby(group_col, dropna=False, sort=True):
-                        label = clean_text(key)
-                        if not label:
-                            continue
-                        result.append(metric_row(label, group, limit, durations))
-
-        return pd.DataFrame(result, columns=stats.columns)
-
-    def write_scale_sheet(sheet_name, aggregate_df):
-        if sheet_name in wb.sheetnames:
-            del wb[sheet_name]
-
-        sws = wb.copy_worksheet(ws)
-        sws.title = sheet_name
+        copied = source_stats.loc[keep].copy().reset_index(drop=True)
 
         old_rows = sws.max_row
         for rr in range(5, old_rows + 1):
             for cc in range(1, 41):
                 sws.cell(rr, cc).value = None
 
-        needed = 5 + len(aggregate_df) - 1
+        needed = 5 + len(copied) - 1
         if needed > old_rows:
             sws.insert_rows(old_rows + 1, needed - old_rows)
 
-        for i, (_, row) in enumerate(aggregate_df.iterrows(), start=5):
-            label = clean_text(row.iloc[0])
+        for i, (_, row) in enumerate(copied.iterrows(), start=5):
+            label = clean_text(row["ปีที่เข้า"])
 
             if label in ("ป.โท", "ป.เอก"):
                 row_fill = red_fill
-            elif re.fullmatch(r"\d{4}", label):
+            elif re.fullmatch(r"\\d{4}", label):
                 row_fill = white_fill
-            else:
+            elif label.startswith("คณะ"):
                 row_fill = pink_fill
+            else:
+                row_fill = green_fill
 
-            # เขียน 37 คอลัมน์แรกก่อน แล้วคำนวณ AL:AN ใหม่
-            scale_values = [
-                row.iloc[j] if pd.notna(row.iloc[j]) else None
-                for j in range(37)
-            ]
-            not_counted = (
-                (scale_values[1] or 0)
-                - (scale_values[29] or 0)
-                - (scale_values[30] or 0)
-                - (scale_values[31] or 0)
-                - (scale_values[34] or 0)
-            )
-            on_time = scale_values[25] or 0
-            on_time_pct = (on_time * 100 / not_counted) if not_counted else 0
-            scale_values += [not_counted, on_time, on_time_pct]
-
+            # คัดลอกค่าทั้ง 40 คอลัมน์จาก Sheet "สถิติ" โดยตรง
             for c in range(1, 41):
                 cell = sws.cell(i, c)
-                value = scale_values[c - 1]
-                cell.value = value
+                value = row.iloc[c - 1]
+                cell.value = value if pd.notna(value) else None
 
-                # ช่องที่ไม่มีข้อมูลใน Sheet "คณะ" / "ปี" ไม่ต้องมีสีพื้น
+                # ช่องว่างไม่มีสีพื้น
                 if value is None or pd.isna(value):
                     cell.fill = PatternFill(fill_type=None)
                 else:
@@ -836,21 +693,13 @@ def make_excel(original_uploaded, original, processed, stats):
                         bold=True,
                     )
 
-            # บังคับเขียน 3 ช่องท้ายของ Sheet คณะ/ปีอีกครั้ง
-            # เพื่อไม่ให้ค่าถูกทับ/หายจากการจัดรูปแบบ
-            sws.cell(i, 38).value = not_counted
-            sws.cell(i, 39).value = on_time
-            sws.cell(i, 40).value = on_time_pct
-
             sws.cell(i, 36).number_format = "0.00"
             sws.cell(i, 37).number_format = "0.00"
-            sws.cell(i, 38).number_format = "0"
-            sws.cell(i, 39).number_format = "0"
             sws.cell(i, 40).number_format = "0.00"
 
         sws.freeze_panes = "A5"
         sws.sheet_view.showGridLines = False
-        if len(aggregate_df):
+        if len(copied):
             sws.auto_filter.ref = f"A4:AN{needed}"
 
     # ลบ Sheet เดิมที่แยก ป.โท / ป.เอก
@@ -858,12 +707,9 @@ def make_excel(original_uploaded, original, processed, stats):
         if old_sheet in wb.sheetnames:
             del wb[old_sheet]
 
-    # สร้างใหม่เป็น 2 Sheet รวมทั้ง ป.โท และ ป.เอก
-    faculty_stats = build_combined_stats("คณะ")
-    year_stats = build_combined_stats(None)
-
-    write_scale_sheet("คณะ", faculty_stats)
-    write_scale_sheet("ปี", year_stats)
+    # ใช้ข้อมูลจาก Sheet "สถิติ" โดยตรง ไม่คำนวณใหม่
+    write_copied_stats_sheet("คณะ", stats, "faculty")
+    write_copied_stats_sheet("ปี", stats, "year")
 
     out = io.BytesIO()
     wb.save(out)
