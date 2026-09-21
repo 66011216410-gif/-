@@ -689,45 +689,116 @@ def make_excel(original_uploaded, original, processed, stats):
             sws.auto_filter.ref = f"A3:AN{needed}"
 
     # แยกเป็น 4 Sheet ตามระดับและมิติ
-    # 1. ป.โท คณะ
-    # 2. ป.โท ปี
-    # 3. ป.เอก คณะ
-    # 4. ป.เอก ปี
+    # รูปแบบ Sheet "คณะ" ให้เรียง: ระดับ -> ปี -> คณะ
+    # รูปแบบ Sheet "ปี" ให้เรียง: ระดับ -> ปี
+    def build_level_faculty_stats(level_name, level_data):
+        result = []
+        limit = 2 if level_name == "ป.โท" else 4
+
+        # แถวแรกเป็นยอดรวมของระดับ เช่น ป.โท / ป.เอก
+        result.append(metric_row(level_name, level_data, limit, durations))
+
+        years = sorted(
+            pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce").dropna().unique()
+        )
+        for year in years:
+            gy = level_data[
+                pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce") == year
+            ]
+            result.append(metric_row(int(year), gy, limit, durations))
+
+            # ใต้แต่ละปี แสดงเฉพาะระดับคณะ ตามรูปแบบที่ต้องการ
+            for faculty, gf in gy.groupby("คณะ", dropna=False, sort=True):
+                faculty = clean_text(faculty)
+                if not faculty:
+                    continue
+                result.append(metric_row(faculty, gf, limit, durations))
+
+        return pd.DataFrame(result, columns=stats.columns)
+
+    def build_level_year_stats(level_name, level_data):
+        result = []
+        limit = 2 if level_name == "ป.โท" else 4
+
+        # แถวแรกเป็นยอดรวมของระดับ เช่น ป.โท / ป.เอก
+        result.append(metric_row(level_name, level_data, limit, durations))
+
+        years = sorted(
+            pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce").dropna().unique()
+        )
+        for year in years:
+            gy = level_data[
+                pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce") == year
+            ]
+            result.append(metric_row(int(year), gy, limit, durations))
+
+        return pd.DataFrame(result, columns=stats.columns)
+
+    def write_scale_sheet(sheet_name, aggregate_df):
+        if sheet_name in wb.sheetnames:
+            del wb[sheet_name]
+
+        sws = wb.copy_worksheet(ws)
+        sws.title = sheet_name
+
+        old_rows = sws.max_row
+        for rr in range(4, old_rows + 1):
+            for cc in range(1, 41):
+                sws.cell(rr, cc).value = None
+
+        needed = 4 + len(aggregate_df) - 1
+        if needed > old_rows:
+            sws.insert_rows(old_rows + 1, needed - old_rows)
+
+        for i, (_, row) in enumerate(aggregate_df.iterrows(), start=4):
+            label = clean_text(row.iloc[0])
+
+            # สีตามรูปแบบตัวอย่าง:
+            # ระดับ = แดง, ปี = ขาว, คณะ = ชมพู
+            if label in ("ป.โท", "ป.เอก"):
+                row_fill = red_fill
+            elif re.fullmatch(r"\\d{4}", label):
+                row_fill = white_fill
+            else:
+                row_fill = pink_fill
+
+            for c in range(1, 41):
+                cell = sws.cell(i, c)
+                value = row.iloc[c - 1]
+                cell.value = value if pd.notna(value) else None
+                cell.fill = row_fill
+                cell.font = black_font
+                cell.alignment = center
+                cell.border = border
+
+            # แถวระดับใช้ตัวหนา
+            if label in ("ป.โท", "ป.เอก"):
+                for c in range(1, 41):
+                    sws.cell(i, c).font = Font(
+                        name="Tahoma",
+                        size=10,
+                        color="000000",
+                        bold=True,
+                    )
+
+            sws.cell(i, 36).number_format = "0.00"
+            sws.cell(i, 37).number_format = "0.00"
+            sws.cell(i, 40).number_format = "0.00"
+
+        sws.freeze_panes = "A4"
+        sws.sheet_view.showGridLines = False
+        if len(aggregate_df):
+            sws.auto_filter.ref = f"A3:AN{needed}"
+
     for level_name, level_value in [("ป.โท", "ป.โท"), ("ป.เอก", "ป.เอก")]:
         level_data = processed[processed["ระดับ"] == level_value].copy()
+        if level_data.empty:
+            continue
 
-        faculty_stats = build_aggregate_stats("คณะ") if not level_data.empty else pd.DataFrame(columns=stats.columns)
-        year_stats = build_aggregate_stats("ปีที่เข้า") if not level_data.empty else pd.DataFrame(columns=stats.columns)
-
-        # build_aggregate_stats ใช้ processed ทั้งชุด จึงกรองภายในฟังก์ชันด้วยระดับก่อนเขียน
-        if not level_data.empty:
-            def build_level_aggregate(group_col, data=level_data):
-                grouped = data.groupby(group_col, dropna=False, sort=True)
-                result = []
-                for key, group in grouped:
-                    label = clean_text(key)
-                    if not label:
-                        continue
-                    limit = 2 if level_value == "ป.โท" else 4
-                    result.append(metric_row(label, group, limit, durations))
-
-                total = metric_row("รวมทั้งหมด", data, 2 if level_value == "ป.โท" else 4, durations)
-                grads = data[data["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"]
-                if "รหัสนิสิต" in grads.columns:
-                    total["จำนวนนิสิตจบ_ทั้งหมด"] = grads["รหัสนิสิต"].map(clean_text).replace("", pd.NA).dropna().nunique()
-                    total["จำนวนนิสิตจบ_ตามหลักสูตร"] = grads.loc[
-                        grads["ระยะเวลา(ปี)"] <= (2 if level_value == "ป.โท" else 4), "รหัสนิสิต"
-                    ].map(clean_text).replace("", pd.NA).dropna().nunique()
-                    total["%จบตามเวลา"] = (
-                        total["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100 /
-                        total["จำนวนนิสิตที่ไม่นับสถานะ"]
-                        if total["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
-                    )
-                result.append(total)
-                return pd.DataFrame(result, columns=stats.columns)
-
-            faculty_stats = build_level_aggregate("คณะ")
-            year_stats = build_level_aggregate("ปีที่เข้า")
+        # Sheet คณะ: ระดับ -> ปี -> คณะ
+        faculty_stats = build_level_faculty_stats(level_name, level_data)
+        # Sheet ปี: ระดับ -> ปี
+        year_stats = build_level_year_stats(level_name, level_data)
 
         write_scale_sheet(f"{level_name} คณะ", faculty_stats)
         write_scale_sheet(f"{level_name} ปี", year_stats)
