@@ -578,18 +578,31 @@ def make_excel(original_uploaded, original, processed, stats):
     # ============================================================
     def build_aggregate_stats(group_col):
         agg_rows = []
-        grouped = processed.groupby(group_col, dropna=False, sort=True)
 
-        for key, group in grouped:
+        # แยก ป.โท / ป.เอก ภายในแต่ละคณะหรือปี
+        grouped = processed.groupby(
+            [group_col, "ระดับ"], dropna=False, sort=True
+        )
+
+        for (key, level), group in grouped:
             label = clean_text(key)
             if not label:
                 continue
+            label = f"{label} - {level}"
 
-            # ใช้ metric_row เพื่อคำนวณสถิติทุกช่อง
-            limit = 2 if (group["ระดับ"].eq("ป.โท").all()) else 4
+            limit = 2 if level == "ป.โท" else 4
             rr = metric_row(label, group, limit, durations)
+            agg_rows.append(rr)
 
-            # ถ้ามีทั้ง ป.โท และ ป.เอก ให้คำนวณ "จบตามหลักสูตร"
+        # แถวรวมของแต่ละระดับ
+        for level, group in processed.groupby("ระดับ", dropna=False, sort=True):
+            level = clean_text(level)
+            if not level:
+                continue
+
+            limit = 2 if level == "ป.โท" else 4
+            rr = metric_row(f"รวมทั้งหมด - {level}", group, limit, durations)
+
             grads_g = group[
                 group["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"
             ].copy()
@@ -598,47 +611,42 @@ def make_excel(original_uploaded, original, processed, stats):
                     grads_g["รหัสนิสิต"].map(clean_text)
                     .replace("", pd.NA).dropna().nunique()
                 )
-                on_time = (
-                    ((grads_g["ระดับ"] == "ป.โท") & (grads_g["ระยะเวลา(ปี)"] <= 2))
-                    | ((grads_g["ระดับ"] == "ป.เอก") & (grads_g["ระยะเวลา(ปี)"] <= 4))
-                )
                 rr["จำนวนนิสิตจบ_ตามหลักสูตร"] = (
-                    grads_g.loc[on_time, "รหัสนิสิต"].map(clean_text)
-                    .replace("", pd.NA).dropna().nunique()
+                    grads_g.loc[
+                        grads_g["ระยะเวลา(ปี)"] <= limit, "รหัสนิสิต"
+                    ].map(clean_text).replace("", pd.NA).dropna().nunique()
                 )
                 rr["%จบตามเวลา"] = (
                     rr["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100
                     / rr["จำนวนนิสิตที่ไม่นับสถานะ"]
                     if rr["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
                 )
-
             agg_rows.append(rr)
 
-        # แถวรวมทั้งหมด
-        if agg_rows:
-            total = metric_row("รวมทั้งหมด", processed, 2, durations)
-            grads_all = processed[
-                processed["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"
-            ].copy()
-            if "รหัสนิสิต" in grads_all.columns:
-                total["จำนวนนิสิตจบ_ทั้งหมด"] = (
-                    grads_all["รหัสนิสิต"].map(clean_text)
-                    .replace("", pd.NA).dropna().nunique()
-                )
-                on_time = (
-                    ((grads_all["ระดับ"] == "ป.โท") & (grads_all["ระยะเวลา(ปี)"] <= 2))
-                    | ((grads_all["ระดับ"] == "ป.เอก") & (grads_all["ระยะเวลา(ปี)"] <= 4))
-                )
-                total["จำนวนนิสิตจบ_ตามหลักสูตร"] = (
-                    grads_all.loc[on_time, "รหัสนิสิต"].map(clean_text)
-                    .replace("", pd.NA).dropna().nunique()
-                )
-                total["%จบตามเวลา"] = (
-                    total["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100
-                    / total["จำนวนนิสิตที่ไม่นับสถานะ"]
-                    if total["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
-                )
-            agg_rows.append(total)
+        # รวมทั้งหมดทุกระดับ
+        total = metric_row("รวมทั้งหมด", processed, 2, durations)
+        grads_all = processed[
+            processed["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"
+        ].copy()
+        if "รหัสนิสิต" in grads_all.columns:
+            total["จำนวนนิสิตจบ_ทั้งหมด"] = (
+                grads_all["รหัสนิสิต"].map(clean_text)
+                .replace("", pd.NA).dropna().nunique()
+            )
+            on_time = (
+                ((grads_all["ระดับ"] == "ป.โท") & (grads_all["ระยะเวลา(ปี)"] <= 2))
+                | ((grads_all["ระดับ"] == "ป.เอก") & (grads_all["ระยะเวลา(ปี)"] <= 4))
+            )
+            total["จำนวนนิสิตจบ_ตามหลักสูตร"] = (
+                grads_all.loc[on_time, "รหัสนิสิต"]
+                .map(clean_text).replace("", pd.NA).dropna().nunique()
+            )
+            total["%จบตามเวลา"] = (
+                total["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100
+                / total["จำนวนนิสิตที่ไม่นับสถานะ"]
+                if total["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
+            )
+        agg_rows.append(total)
 
         return pd.DataFrame(agg_rows, columns=stats.columns)
 
@@ -649,27 +657,25 @@ def make_excel(original_uploaded, original, processed, stats):
         sws = wb.copy_worksheet(ws)
         sws.title = sheet_name
 
-        # ล้างข้อมูลเดิมตั้งแต่แถว 4
         old_rows = sws.max_row
         for rr in range(4, old_rows + 1):
             for cc in range(1, 41):
                 sws.cell(rr, cc).value = None
 
-        # เพิ่มแถวให้พอดีกับข้อมูลใหม่
         needed = 4 + len(aggregate_df) - 1
         if needed > old_rows:
             sws.insert_rows(old_rows + 1, needed - old_rows)
 
         for i, (_, row) in enumerate(aggregate_df.iterrows(), start=4):
             label = clean_text(row.iloc[0])
-            row_fill = pink_fill if label != "รวมทั้งหมด" else gray
+            row_fill = pink_fill if label not in ("รวมทั้งหมด", "รวมทั้งหมด - ป.โท", "รวมทั้งหมด - ป.เอก") else gray
 
             for c in range(1, 41):
                 cell = sws.cell(i, c)
                 value = row.iloc[c - 1]
                 cell.value = value if pd.notna(value) else None
                 cell.fill = row_fill
-                cell.font = black_font if label != "รวมทั้งหมด" else white_font
+                cell.font = black_font if row_fill != gray else white_font
                 cell.alignment = center
                 cell.border = border
 
