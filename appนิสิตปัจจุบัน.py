@@ -738,12 +738,8 @@ if uploaded:
         # ============================================================
         # DASHBOARD — ข้อมูลนิสิตปัจจุบัน
         # ============================================================
-        current_df = df[
-            df["สถานะนิสิต"].astype(str).str.strip()
-            == "นิสิตปัจจุบัน สภาพสมบูรณ์"
-        ].copy()
-
-        level_norm = current_df["ระดับ"].map(normalize_level)
+        # ระดับปริญญาโท / ปริญญาเอก นับจากคอลัมน์ "ระดับ" โดยตรง
+        level_norm = df["ระดับ"].map(normalize_level)
         master_count = int((level_norm == "ป.โท").sum())
         doctoral_count = int((level_norm == "ป.เอก").sum())
 
