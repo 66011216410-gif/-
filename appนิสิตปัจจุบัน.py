@@ -651,6 +651,8 @@ def make_excel(original_uploaded, original, processed, stats):
         for rr in range(5, old_rows + 1):
             for cc in range(1, 41):
                 sws.cell(rr, cc).value = None
+                # ล้างสีของแถวว่างด้านล่างทั้งหมด
+                sws.cell(rr, cc).fill = PatternFill(fill_type=None)
 
         needed = 5 + len(copied) - 1
         if needed > old_rows:
