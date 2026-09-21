@@ -572,6 +572,122 @@ def make_excel(original_uploaded, original, processed, stats):
     if len(stats):
         ws.auto_filter.ref = f"A3:AN{needed_last}"
 
+    # ============================================================
+    # เพิ่ม Sheet สเกลคณะ และ Sheet สเกลปี
+    # ใช้โครงสร้างเดียวกับ Sheet "สถิติ" แต่สรุปคนละมิติ
+    # ============================================================
+    def build_aggregate_stats(group_col):
+        agg_rows = []
+        grouped = processed.groupby(group_col, dropna=False, sort=True)
+
+        for key, group in grouped:
+            label = clean_text(key)
+            if not label:
+                continue
+
+            # ใช้ metric_row เพื่อคำนวณสถิติทุกช่อง
+            limit = 2 if (group["ระดับ"].eq("ป.โท").all()) else 4
+            rr = metric_row(label, group, limit, durations)
+
+            # ถ้ามีทั้ง ป.โท และ ป.เอก ให้คำนวณ "จบตามหลักสูตร"
+            grads_g = group[
+                group["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"
+            ].copy()
+            if "รหัสนิสิต" in grads_g.columns:
+                rr["จำนวนนิสิตจบ_ทั้งหมด"] = (
+                    grads_g["รหัสนิสิต"].map(clean_text)
+                    .replace("", pd.NA).dropna().nunique()
+                )
+                on_time = (
+                    ((grads_g["ระดับ"] == "ป.โท") & (grads_g["ระยะเวลา(ปี)"] <= 2))
+                    | ((grads_g["ระดับ"] == "ป.เอก") & (grads_g["ระยะเวลา(ปี)"] <= 4))
+                )
+                rr["จำนวนนิสิตจบ_ตามหลักสูตร"] = (
+                    grads_g.loc[on_time, "รหัสนิสิต"].map(clean_text)
+                    .replace("", pd.NA).dropna().nunique()
+                )
+                rr["%จบตามเวลา"] = (
+                    rr["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100
+                    / rr["จำนวนนิสิตที่ไม่นับสถานะ"]
+                    if rr["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
+                )
+
+            agg_rows.append(rr)
+
+        # แถวรวมทั้งหมด
+        if agg_rows:
+            total = metric_row("รวมทั้งหมด", processed, 2, durations)
+            grads_all = processed[
+                processed["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"
+            ].copy()
+            if "รหัสนิสิต" in grads_all.columns:
+                total["จำนวนนิสิตจบ_ทั้งหมด"] = (
+                    grads_all["รหัสนิสิต"].map(clean_text)
+                    .replace("", pd.NA).dropna().nunique()
+                )
+                on_time = (
+                    ((grads_all["ระดับ"] == "ป.โท") & (grads_all["ระยะเวลา(ปี)"] <= 2))
+                    | ((grads_all["ระดับ"] == "ป.เอก") & (grads_all["ระยะเวลา(ปี)"] <= 4))
+                )
+                total["จำนวนนิสิตจบ_ตามหลักสูตร"] = (
+                    grads_all.loc[on_time, "รหัสนิสิต"].map(clean_text)
+                    .replace("", pd.NA).dropna().nunique()
+                )
+                total["%จบตามเวลา"] = (
+                    total["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100
+                    / total["จำนวนนิสิตที่ไม่นับสถานะ"]
+                    if total["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
+                )
+            agg_rows.append(total)
+
+        return pd.DataFrame(agg_rows, columns=stats.columns)
+
+    def write_scale_sheet(sheet_name, aggregate_df):
+        if sheet_name in wb.sheetnames:
+            del wb[sheet_name]
+
+        sws = wb.copy_worksheet(ws)
+        sws.title = sheet_name
+
+        # ล้างข้อมูลเดิมตั้งแต่แถว 4
+        old_rows = sws.max_row
+        for rr in range(4, old_rows + 1):
+            for cc in range(1, 41):
+                sws.cell(rr, cc).value = None
+
+        # เพิ่มแถวให้พอดีกับข้อมูลใหม่
+        needed = 4 + len(aggregate_df) - 1
+        if needed > old_rows:
+            sws.insert_rows(old_rows + 1, needed - old_rows)
+
+        for i, (_, row) in enumerate(aggregate_df.iterrows(), start=4):
+            label = clean_text(row.iloc[0])
+            row_fill = pink_fill if label != "รวมทั้งหมด" else gray
+
+            for c in range(1, 41):
+                cell = sws.cell(i, c)
+                value = row.iloc[c - 1]
+                cell.value = value if pd.notna(value) else None
+                cell.fill = row_fill
+                cell.font = black_font if label != "รวมทั้งหมด" else white_font
+                cell.alignment = center
+                cell.border = border
+
+            sws.cell(i, 36).number_format = "0.00"
+            sws.cell(i, 37).number_format = "0.00"
+            sws.cell(i, 40).number_format = "0.00"
+
+        sws.freeze_panes = "A4"
+        sws.sheet_view.showGridLines = False
+        if len(aggregate_df):
+            sws.auto_filter.ref = f"A3:AN{needed}"
+
+    faculty_stats = build_aggregate_stats("คณะ")
+    year_stats = build_aggregate_stats("ปีที่เข้า")
+
+    write_scale_sheet("สเกลคณะ", faculty_stats)
+    write_scale_sheet("สเกลปี", year_stats)
+
     out = io.BytesIO()
     wb.save(out)
     out.seek(0)
