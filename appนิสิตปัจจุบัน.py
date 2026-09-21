@@ -738,17 +738,23 @@ if uploaded:
         # ============================================================
         # DASHBOARD — ข้อมูลนิสิตปัจจุบัน
         # ============================================================
-        # ระดับปริญญาโท / ปริญญาเอก นับจากคอลัมน์ "ระดับ" โดยตรง
-        level_norm = df["ระดับ"].map(normalize_level)
+        # Dashboard ทั้ง 4 ตัวนับเฉพาะสถานะ "นิสิตปัจจุบัน สภาพสมบูรณ์"
+        current_df = df[
+            df["สถานะนิสิต"].astype(str).str.strip()
+            == "นิสิตปัจจุบัน สภาพสมบูรณ์"
+        ].copy()
+
+        # ป.โท / ป.เอก นับจากคอลัมน์ "ระดับ"
+        level_norm = current_df["ระดับ"].map(normalize_level)
         master_count = int((level_norm == "ป.โท").sum())
         doctoral_count = int((level_norm == "ป.เอก").sum())
 
-        # นับสัญชาติจากคอลัมน์ "ไทย-ต่างชาติ" โดยตรง
+        # ไทย / ต่างชาติ นับจากคอลัมน์ "ไทย-ต่างชาติ"
         thai_count = int(
-            (df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ไทย").sum()
+            (current_df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ไทย").sum()
         )
         foreign_count = int(
-            (df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ต่างชาติ").sum()
+            (current_df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ต่างชาติ").sum()
         )
 
         st.markdown(
