@@ -778,15 +778,15 @@ def make_excel(original_uploaded, original, processed, stats):
         sws.title = sheet_name
 
         old_rows = sws.max_row
-        for rr in range(4, old_rows + 1):
+        for rr in range(5, old_rows + 1):
             for cc in range(1, 41):
                 sws.cell(rr, cc).value = None
 
-        needed = 4 + len(aggregate_df) - 1
+        needed = 5 + len(aggregate_df) - 1
         if needed > old_rows:
             sws.insert_rows(old_rows + 1, needed - old_rows)
 
-        for i, (_, row) in enumerate(aggregate_df.iterrows(), start=4):
+        for i, (_, row) in enumerate(aggregate_df.iterrows(), start=5):
             label = clean_text(row.iloc[0])
 
             if label in ("ป.โท", "ป.เอก"):
@@ -848,10 +848,10 @@ def make_excel(original_uploaded, original, processed, stats):
             sws.cell(i, 39).number_format = "0"
             sws.cell(i, 40).number_format = "0.00"
 
-        sws.freeze_panes = "A4"
+        sws.freeze_panes = "A5"
         sws.sheet_view.showGridLines = False
         if len(aggregate_df):
-            sws.auto_filter.ref = f"A3:AN{needed}"
+            sws.auto_filter.ref = f"A4:AN{needed}"
 
     # ลบ Sheet เดิมที่แยก ป.โท / ป.เอก
     for old_sheet in ["ป.โท คณะ", "ป.โท ปี", "ป.เอก คณะ", "ป.เอก ปี", "คณะ", "ปี"]:
