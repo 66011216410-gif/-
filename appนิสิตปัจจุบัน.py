@@ -141,7 +141,18 @@ def metric_row(label, g, limit, durations):
     )
 
     r["ยังไม่จบ_ทั้งหมด"] = len(g) - len(grads)
+
+    # คอลัมน์ "นิสิตปัจจุบัน" ให้นับเฉพาะ 2 สถานะนี้เท่านั้น:
+    # 1) นิสิตปัจจุบัน
+    # 2) สภาพสมบูรณ์
+    current_statuses = {"นิสิตปัจจุบัน", "สภาพสมบูรณ์"}
+    r["นิสิตปัจจุบัน"] = int(
+        g["สถานะนิสิต"].map(clean_text).isin(current_statuses).sum()
+    )
+
     for stt in STATUS_DISPLAY:
+        if stt == "นิสิตปัจจุบัน":
+            continue
         r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())
     r["พ้นสภาพคืนไม่ได้"] = int(
         (g["สถานะกลุ่ม"] == "พ้นสภาพคืนไม่ได้").sum()
