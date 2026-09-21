@@ -747,11 +747,12 @@ if uploaded:
         master_count = int((level_norm == "ป.โท").sum())
         doctoral_count = int((level_norm == "ป.เอก").sum())
 
+        # นับสัญชาติจากคอลัมน์ "ไทย-ต่างชาติ" โดยตรง
         thai_count = int(
-            (current_df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ไทย").sum()
+            (df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ไทย").sum()
         )
         foreign_count = int(
-            (current_df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ต่างชาติ").sum()
+            (df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ต่างชาติ").sum()
         )
 
         st.markdown(
