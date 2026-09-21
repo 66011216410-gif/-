@@ -105,7 +105,8 @@ def metric_row(label, g, limit, durations):
     for d in durations:
         r[d] = int((g["ระยะเวลา(ปี)"] == d).sum())
 
-    grads = g[g["สถานะกลุ่ม"] == "สำเร็จการศึกษา"]
+    # จำนวนนิสิตจบทั้งหมด = นับเฉพาะผู้ที่มีสถานะ "สำเร็จการศึกษา"
+    grads = g[g["สถานะกลุ่ม"] == "สำเร็จการศึกษา"].copy()
     valid = g[~g["สถานะกลุ่ม"].isin(STATUS_EXCLUDE)]
     valid_duration = valid["ระยะเวลา(ปี)"].dropna()
 
