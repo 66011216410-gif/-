@@ -268,7 +268,7 @@ def copy_row_style(ws, source_row, target_row, max_col=40):
 
 
 def make_excel(original_uploaded, original, processed, stats):
-    """ใช้ Sheet สถิติเดิมเป็นแม่แบบ เพื่อคงสี/เส้น/รูปแบบเซลล์"""
+    """สร้าง Sheet สถิติให้เป็น Template ตามแบบที่กำหนด พร้อมคงสี/เส้น/รูปแบบ"""
     from openpyxl import load_workbook
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
@@ -279,9 +279,8 @@ def make_excel(original_uploaded, original, processed, stats):
         del wb["ข้อมูลประมวลผล"]
 
     ws_processed = wb.create_sheet("ข้อมูลประมวลผล")
-    for row in [
-        processed.columns.tolist()
-    ] + processed.where(pd.notna(processed), None).values.tolist():
+    ws_processed.append(processed.columns.tolist())
+    for row in processed.where(pd.notna(processed), None).values.tolist():
         ws_processed.append(row)
 
     ws_processed.freeze_panes = "A2"
@@ -292,81 +291,201 @@ def make_excel(original_uploaded, original, processed, stats):
     else:
         ws = wb.create_sheet("สถิติ")
 
-    # หัวข้อ 4 ช่องใหม่
-    ws["Z4"] = "ตามระยะเวลาของหลักสูตร 2 ปี/ 4 ปี (คน)"
-    ws["AM2"] = "ตามระยะเวลาของหลักสูตร 2 ปี/ 4 ปี (คน)"
-    ws["AN2"] = "% จบตามเวลา"
-    ws["AJ2"] = "เฉลี่ยระยะเวลาที่ใช้(ปี)"
-    ws["AK2"] = (
-        "เฉลี่ยระยะเวลาที่ใช้(ปี) ไม่นับรวมนิสิตสถานะ "
-        "เสียชีวิต พ้นสภาพคืนไม่ได้ ลาออก"
-    )
-    ws["AL2"] = (
-        "จำนวนนิสิตที่ไม่นับสถานะ "
-        "เสียชีวิต พ้นสภาพคืนไม่ได้ ลาออก"
+    # ============================================================
+    # TEMPLATE SHEET "สถิติ"
+    # ============================================================
+    gray = PatternFill(fill_type="solid", fgColor="808080")
+    red_fill = PatternFill(fill_type="solid", fgColor="FF0000")
+    pink_fill = PatternFill(fill_type="solid", fgColor="FF99CC")
+    green_fill = PatternFill(fill_type="solid", fgColor="A9D18E")
+    white_fill = PatternFill(fill_type="solid", fgColor="FFFFFF")
+    blue_fill = PatternFill(fill_type="solid", fgColor="2F5597")
+
+    white_font = Font(name="Tahoma", size=10, color="FFFFFF", bold=True)
+    black_font = Font(name="Tahoma", size=10, color="000000")
+    red_font = Font(name="Tahoma", size=10, color="FF0000", bold=True)
+    blue_font = Font(name="Tahoma", size=10, color="FFFFFF", bold=True)
+
+    thin = Side(style="thin", color="000000")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    center = Alignment(
+        horizontal="center",
+        vertical="center",
+        wrap_text=True,
     )
 
-    # ล้างเฉพาะค่าเดิม แต่คงสี/เส้น/รูปแบบเซลล์ไว้
-    first_data_row = 5
-    existing_last = ws.max_row
+    # ยกเลิก merge เดิมเฉพาะบริเวณหัวตาราง
+    for merged in list(ws.merged_cells.ranges):
+        if merged.min_row <= 3 and merged.min_col <= 40:
+            ws.unmerge_cells(str(merged))
 
-    for r in range(first_data_row, existing_last + 1):
+    # ล้างหัวตาราง A1:AN3 แล้วสร้างโครงใหม่
+    for r in range(1, 4):
         for c in range(1, 41):
             ws.cell(r, c).value = None
+            ws.cell(r, c).fill = gray
+            ws.cell(r, c).font = white_font
+            ws.cell(r, c).alignment = center
+            ws.cell(r, c).border = border
 
-    template_row = max(first_data_row, existing_last)
+    # กลุ่มหัวตาราง
+    ws.merge_cells("A1:A3")
+    ws.merge_cells("B1:B3")
+    ws.merge_cells("C1:X1")
+    ws.merge_cells("Y1:AA1")
+    ws.merge_cells("AB1:AI1")
 
+    for col in range(3, 25):
+        ws.merge_cells(start_row=2, start_column=col, end_row=3, end_column=col)
+
+    for col in range(25, 28):
+        ws.merge_cells(start_row=2, start_column=col, end_row=3, end_column=col)
+
+    for col in range(28, 36):
+        ws.merge_cells(start_row=2, start_column=col, end_row=3, end_column=col)
+
+    for col in range(36, 41):
+        ws.merge_cells(start_row=1, start_column=col, end_row=3, end_column=col)
+
+    ws["A1"] = "ปีที่เข้า"
+    ws["B1"] = "จำนวน\nนิสิต\nรับเข้า(คน)"
+    ws["C1"] = "ระยะเวลา(ปี)"
+    ws["Y1"] = "จำนวนนิสิตจบ"
+    ws["AB1"] = "จำนวนนิสิตที่ยังไม่จบ"
+
+    durations = [x / 2 for x in range(1, 23)]
+    for i, value in enumerate(durations, start=3):
+        ws.cell(2, i).value = value
+
+    ws["Y2"] = "ทั้งหมด(คน)"
+    ws["Z2"] = "ตาม\nระยะเวลา\nของหลักสูตร\n2 ปี/ 4 ปี\n(คน)"
+    ws["AA2"] = "% จบ\nตามเวลา"
+
+    ws["AB2"] = "ทั้งหมด"
+    ws["AC2"] = "นิสิตปัจจุบัน"
+    ws["AD2"] = "พ้นสภาพ (คณบดีอนุมัติ)"
+    ws["AE2"] = "พ้นสภาพ (เสียชีวิต)"
+    ws["AF2"] = "พ้นสภาพ"
+    ws["AG2"] = "รักษาสภาพนิสิต"
+    ws["AH2"] = "ลาพักการเรียน"
+    ws["AI2"] = "ลาออก"
+
+    ws["AJ1"] = "เฉลี่ย\nระยะเวลาที่ใช้(ปี)"
+    ws["AK1"] = (
+        "เฉลี่ยระยะเวลาที่ใช้(ปี)\n"
+        "ไม่นับรวมนิสิตสถานะ\n"
+        "เสียชีวิต พ้นสภาพคืนไม่ได้ ลาออก"
+    )
+    ws["AL1"] = (
+        "จำนวนนิสิตที่ไม่นับสถานะ\n"
+        "เสียชีวิต พ้นสภาพคืนไม่ได้"
+    )
+    ws["AM1"] = "ตาม\nระยะเวลาของหลักสูตร\n2 ปี/ 4 ปี\n(คน)"
+    ws["AN1"] = "% จบ\nตามเวลา"
+
+    # รูปแบบหัวตาราง
+    for r in range(1, 4):
+        for c in range(1, 41):
+            cell = ws.cell(r, c)
+            cell.fill = gray
+            cell.font = white_font
+            cell.alignment = center
+            cell.border = border
+
+    # คอลัมน์ AL ตาม Template ใช้สีน้ำเงิน
+    ws["AL1"].fill = blue_fill
+    ws["AL1"].font = blue_font
+
+    # หัวข้อสถานะที่เป็นสีแดงตาม Template
+    for cell_ref in ["AD2", "AE2", "AF2", "AI2"]:
+        ws[cell_ref].font = red_font
+
+    # ความกว้างคอลัมน์
+    widths = {
+        "A": 11, "B": 12,
+        "Y": 12, "Z": 13, "AA": 10,
+        "AB": 11, "AC": 12, "AD": 15, "AE": 15,
+        "AF": 11, "AG": 13, "AH": 13, "AI": 10,
+        "AJ": 12, "AK": 16, "AL": 15, "AM": 13, "AN": 10,
+    }
+    for col in range(3, 25):
+        widths[chr(64 + col)] = 7
+    for col_letter, width in widths.items():
+        ws.column_dimensions[col_letter].width = width
+
+    ws.row_dimensions[1].height = 25
+    ws.row_dimensions[2].height = 27
+    ws.row_dimensions[3].height = 27
+
+    # ============================================================
+    # DATA ROWS — เริ่มที่แถว 4 ตาม Template
+    # ============================================================
+    first_data_row = 4
+    old_last = ws.max_row
+
+    # ล้างค่าเดิม แต่คงโครงสร้างหัวตาราง
+    if old_last >= first_data_row:
+        for r in range(first_data_row, old_last + 1):
+            for c in range(1, 41):
+                ws.cell(r, c).value = None
+
+    # ถ้าจำนวนแถวใหม่มากกว่าเดิม ให้เพิ่มแถว
+    needed_last = first_data_row + len(stats) - 1
+    if needed_last > old_last:
+        ws.insert_rows(old_last + 1, needed_last - old_last)
+
+    # เขียนข้อมูล 40 คอลัมน์
     for i, (_, row) in enumerate(stats.iterrows(), start=first_data_row):
-        if i > existing_last:
-            ws.insert_rows(i)
-            copy_row_style(ws, template_row, i, 40)
-
-        vals = [
+        values = [
             row.iloc[j] if pd.notna(row.iloc[j]) else None
             for j in range(40)
         ]
 
-        for c, value in enumerate(vals, start=1):
-            ws.cell(i, c).value = value
+        label = clean_text(values[0])
 
-        # AJ, AK และ AN แสดงทศนิยม 2 ตำแหน่ง
+        if label in ("ป.โท", "ป.เอก"):
+            row_fill = red_fill
+        elif re.fullmatch(r"\\d{4}", label):
+            row_fill = white_fill
+        elif label.startswith("คณะ"):
+            row_fill = pink_fill
+        else:
+            row_fill = green_fill
+
+        for c, value in enumerate(values, start=1):
+            cell = ws.cell(i, c)
+            cell.value = value
+            cell.fill = row_fill
+            cell.font = black_font
+            cell.alignment = center
+            cell.border = border
+
+        # แถวระดับใช้ตัวหนา
+        if label in ("ป.โท", "ป.เอก"):
+            for c in range(1, 41):
+                ws.cell(i, c).font = Font(
+                    name="Tahoma",
+                    size=10,
+                    color="000000",
+                    bold=True,
+                )
+
+        # ตัวเลขระยะเวลาเฉลี่ยและ % แสดง 2 ตำแหน่ง
         ws.cell(i, 36).number_format = "0.00"
         ws.cell(i, 37).number_format = "0.00"
         ws.cell(i, 40).number_format = "0.00"
 
-    # ถ้า template มีแถวเหลือ ให้ล้างค่าแต่ไม่ลบ style
-    for r in range(
-        first_data_row + len(stats), existing_last + 1
-    ):
+    # ล้างแถวที่เกินจากข้อมูลใหม่
+    for r in range(needed_last + 1, old_last + 1):
         for c in range(1, 41):
             ws.cell(r, c).value = None
 
-    ws.freeze_panes = "A5"
+    ws.freeze_panes = "A4"
+    ws.sheet_view.showGridLines = False
 
     if len(stats):
-        ws.auto_filter.ref = f"A4:AN{first_data_row + len(stats) - 1}"
-
-    # fallback สำหรับไฟล์ที่ไม่มี style ในหัวข้อใหม่
-    if ws["AJ2"].fill.fill_type is None:
-        gray = PatternFill(fill_type="solid", fgColor="808080")
-        white_font = Font(color="FFFFFF", bold=True)
-        thin = Side(style="thin", color="000000")
-
-        for c in range(36, 41):
-            cell = ws.cell(2, c)
-            cell.fill = gray
-            cell.font = white_font
-            cell.alignment = Alignment(
-                horizontal="center",
-                vertical="center",
-                wrap_text=True,
-            )
-            cell.border = Border(
-                left=thin,
-                right=thin,
-                top=thin,
-                bottom=thin,
-            )
+        ws.auto_filter.ref = f"A3:AN{needed_last}"
 
     out = io.BytesIO()
     wb.save(out)
