@@ -688,49 +688,36 @@ def make_excel(original_uploaded, original, processed, stats):
         if len(aggregate_df):
             sws.auto_filter.ref = f"A3:AN{needed}"
 
-    # แยกเป็น 4 Sheet ตามระดับและมิติ
-    # รูปแบบ Sheet "คณะ" ให้เรียง: ระดับ -> ปี -> คณะ
-    # รูปแบบ Sheet "ปี" ให้เรียง: ระดับ -> ปี
-    def build_level_faculty_stats(level_name, level_data):
+    # รวม ป.โท และ ป.เอก ไว้ใน Sheet เดียวกัน
+    # มี 2 Sheet: "คณะ" และ "ปี"
+    # โครงสร้าง Sheet คณะ: ป.โท -> ปี -> คณะ -> ป.เอก -> ปี -> คณะ
+    # โครงสร้าง Sheet ปี: ป.โท -> ปี -> ป.เอก -> ปี
+    def build_combined_stats(group_col=None):
         result = []
-        limit = 2 if level_name == "ป.โท" else 4
 
-        # แถวแรกเป็นยอดรวมของระดับ เช่น ป.โท / ป.เอก
-        result.append(metric_row(level_name, level_data, limit, durations))
+        for level_name, level_value in [("ป.โท", "ป.โท"), ("ป.เอก", "ป.เอก")]:
+            level_data = processed[processed["ระดับ"] == level_value].copy()
+            if level_data.empty:
+                continue
 
-        years = sorted(
-            pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce").dropna().unique()
-        )
-        for year in years:
-            gy = level_data[
-                pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce") == year
-            ]
-            result.append(metric_row(int(year), gy, limit, durations))
+            limit = 2 if level_name == "ป.โท" else 4
+            result.append(metric_row(level_name, level_data, limit, durations))
 
-            # ใต้แต่ละปี แสดงเฉพาะระดับคณะ ตามรูปแบบที่ต้องการ
-            for faculty, gf in gy.groupby("คณะ", dropna=False, sort=True):
-                faculty = clean_text(faculty)
-                if not faculty:
-                    continue
-                result.append(metric_row(faculty, gf, limit, durations))
+            years = sorted(
+                pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce").dropna().unique()
+            )
+            for year in years:
+                gy = level_data[
+                    pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce") == year
+                ]
+                result.append(metric_row(int(year), gy, limit, durations))
 
-        return pd.DataFrame(result, columns=stats.columns)
-
-    def build_level_year_stats(level_name, level_data):
-        result = []
-        limit = 2 if level_name == "ป.โท" else 4
-
-        # แถวแรกเป็นยอดรวมของระดับ เช่น ป.โท / ป.เอก
-        result.append(metric_row(level_name, level_data, limit, durations))
-
-        years = sorted(
-            pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce").dropna().unique()
-        )
-        for year in years:
-            gy = level_data[
-                pd.to_numeric(level_data["ปีที่เข้า"], errors="coerce") == year
-            ]
-            result.append(metric_row(int(year), gy, limit, durations))
+                if group_col is not None:
+                    for key, group in gy.groupby(group_col, dropna=False, sort=True):
+                        label = clean_text(key)
+                        if not label:
+                            continue
+                        result.append(metric_row(label, group, limit, durations))
 
         return pd.DataFrame(result, columns=stats.columns)
 
@@ -753,8 +740,6 @@ def make_excel(original_uploaded, original, processed, stats):
         for i, (_, row) in enumerate(aggregate_df.iterrows(), start=4):
             label = clean_text(row.iloc[0])
 
-            # สีตามรูปแบบตัวอย่าง:
-            # ระดับ = แดง, ปี = ขาว, คณะ = ชมพู
             if label in ("ป.โท", "ป.เอก"):
                 row_fill = red_fill
             elif re.fullmatch(r"\\d{4}", label):
@@ -771,7 +756,6 @@ def make_excel(original_uploaded, original, processed, stats):
                 cell.alignment = center
                 cell.border = border
 
-            # แถวระดับใช้ตัวหนา
             if label in ("ป.โท", "ป.เอก"):
                 for c in range(1, 41):
                     sws.cell(i, c).font = Font(
@@ -790,18 +774,17 @@ def make_excel(original_uploaded, original, processed, stats):
         if len(aggregate_df):
             sws.auto_filter.ref = f"A3:AN{needed}"
 
-    for level_name, level_value in [("ป.โท", "ป.โท"), ("ป.เอก", "ป.เอก")]:
-        level_data = processed[processed["ระดับ"] == level_value].copy()
-        if level_data.empty:
-            continue
+    # ลบ Sheet เดิมที่แยก ป.โท / ป.เอก
+    for old_sheet in ["ป.โท คณะ", "ป.โท ปี", "ป.เอก คณะ", "ป.เอก ปี", "คณะ", "ปี"]:
+        if old_sheet in wb.sheetnames:
+            del wb[old_sheet]
 
-        # Sheet คณะ: ระดับ -> ปี -> คณะ
-        faculty_stats = build_level_faculty_stats(level_name, level_data)
-        # Sheet ปี: ระดับ -> ปี
-        year_stats = build_level_year_stats(level_name, level_data)
+    # สร้างใหม่เป็น 2 Sheet รวมทั้ง ป.โท และ ป.เอก
+    faculty_stats = build_combined_stats("คณะ")
+    year_stats = build_combined_stats(None)
 
-        write_scale_sheet(f"{level_name} คณะ", faculty_stats)
-        write_scale_sheet(f"{level_name} ปี", year_stats)
+    write_scale_sheet("คณะ", faculty_stats)
+    write_scale_sheet("ปี", year_stats)
 
     out = io.BytesIO()
     wb.save(out)
