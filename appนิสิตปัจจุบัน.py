@@ -836,8 +836,16 @@ def make_excel(original_uploaded, original, processed, stats):
                         bold=True,
                     )
 
+            # บังคับเขียน 3 ช่องท้ายของ Sheet คณะ/ปีอีกครั้ง
+            # เพื่อไม่ให้ค่าถูกทับ/หายจากการจัดรูปแบบ
+            sws.cell(i, 38).value = not_counted
+            sws.cell(i, 39).value = on_time
+            sws.cell(i, 40).value = on_time_pct
+
             sws.cell(i, 36).number_format = "0.00"
             sws.cell(i, 37).number_format = "0.00"
+            sws.cell(i, 38).number_format = "0"
+            sws.cell(i, 39).number_format = "0"
             sws.cell(i, 40).number_format = "0.00"
 
         sws.freeze_panes = "A4"
