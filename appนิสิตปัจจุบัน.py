@@ -751,7 +751,13 @@ def make_excel(original_uploaded, original, processed, stats):
                 cell = sws.cell(i, c)
                 value = row.iloc[c - 1]
                 cell.value = value if pd.notna(value) else None
-                cell.fill = row_fill
+
+                # ช่องที่ไม่มีข้อมูลใน Sheet "คณะ" / "ปี" ไม่ต้องมีสีพื้น
+                if value is None or pd.isna(value):
+                    cell.fill = PatternFill(fill_type=None)
+                else:
+                    cell.fill = row_fill
+
                 cell.font = black_font
                 cell.alignment = center
                 cell.border = border
