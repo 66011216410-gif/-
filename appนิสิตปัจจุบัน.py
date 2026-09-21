@@ -596,7 +596,7 @@ def make_excel(original_uploaded, original, processed, stats):
 
         # ยืนยันการเขียน 3 คอลัมน์ท้าย AL:AN โดยอ้างอิงชื่อคอลัมน์โดยตรง
         # ไม่พึ่งตำแหน่งของ DataFrame
-        ws.cell(i, 38).value = row["จำนวนนิสิตที่ไม่นับสถานะ"]
+        ws.cell(i, 38).value = row["จำนวนนิสิตที่ไม่นับสถานะ เสียชีวิต พ้นสภาพ ลาออก พ้นสภาพ (คณบดีอนุมัติ)"]
         ws.cell(i, 39).value = row["ตามระยะเวลาของหลักสูตร 2 ปี/ 4 ปี (คน)"]
         ws.cell(i, 40).value = row["%จบตามเวลา"]
 
