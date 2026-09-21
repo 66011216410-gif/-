@@ -544,10 +544,26 @@ def make_excel(original_uploaded, original, processed, stats):
 
     # เขียนข้อมูล 40 คอลัมน์
     for i, (_, row) in enumerate(stats.iterrows(), start=first_data_row):
+        # อ่าน 37 คอลัมน์แรกก่อน แล้วคำนวณ 3 คอลัมน์ท้ายใหม่
+        # เพื่อป้องกันค่า AL:AN หายจาก DataFrame/รูปแบบคอลัมน์
         values = [
             row.iloc[j] if pd.notna(row.iloc[j]) else None
-            for j in range(40)
+            for j in range(37)
         ]
+
+        # AL (38) = รับเข้า - คณบดีอนุมัติ - เสียชีวิต - พ้นสภาพ - ลาออก
+        not_counted = (
+            (values[1] or 0)
+            - (values[29] or 0)
+            - (values[30] or 0)
+            - (values[31] or 0)
+            - (values[34] or 0)
+        )
+        # AM (39) = จำนวนนิสิตจบตามระยะเวลาของหลักสูตร
+        on_time = values[25] or 0
+        # AN (40) = % จบตามเวลา
+        on_time_pct = (on_time * 100 / not_counted) if not_counted else 0
+        values += [not_counted, on_time, on_time_pct]
 
         label = clean_text(values[0])
 
@@ -769,10 +785,26 @@ def make_excel(original_uploaded, original, processed, stats):
             else:
                 row_fill = pink_fill
 
+            # เขียน 37 คอลัมน์แรกก่อน แล้วคำนวณ AL:AN ใหม่
+            scale_values = [
+                row.iloc[j] if pd.notna(row.iloc[j]) else None
+                for j in range(37)
+            ]
+            not_counted = (
+                (scale_values[1] or 0)
+                - (scale_values[29] or 0)
+                - (scale_values[30] or 0)
+                - (scale_values[31] or 0)
+                - (scale_values[34] or 0)
+            )
+            on_time = scale_values[25] or 0
+            on_time_pct = (on_time * 100 / not_counted) if not_counted else 0
+            scale_values += [not_counted, on_time, on_time_pct]
+
             for c in range(1, 41):
                 cell = sws.cell(i, c)
-                value = row.iloc[c - 1]
-                cell.value = value if pd.notna(value) else None
+                value = scale_values[c - 1]
+                cell.value = value
 
                 # ช่องที่ไม่มีข้อมูลใน Sheet "คณะ" / "ปี" ไม่ต้องมีสีพื้น
                 if value is None or pd.isna(value):
