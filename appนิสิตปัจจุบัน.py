@@ -634,7 +634,7 @@ def make_excel(original_uploaded, original, processed, stats):
 
         # แถวที่ต้องเก็บจาก Sheet "สถิติ"
         is_level = labels.isin(["ป.โท", "ป.เอก"])
-        is_year = labels.str.fullmatch(r"\\d{4}", na=False)
+        is_year = labels.str.match(r"^\\d{4}(?:\\.0)?$", na=False)
         is_faculty = labels.str.startswith("คณะ", na=False)
         is_total = labels == "รวมทั้งหมด"
 
