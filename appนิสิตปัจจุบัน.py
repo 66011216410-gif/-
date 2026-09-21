@@ -531,7 +531,7 @@ def make_excel(original_uploaded, original, processed, stats):
 
         if label in ("ป.โท", "ป.เอก"):
             row_fill = red_fill
-        elif re.fullmatch(r"\\d{4}", label):
+        elif re.fullmatch(r"\d{4}", label):
             row_fill = white_fill
         elif label.startswith("คณะ"):
             row_fill = pink_fill
@@ -742,7 +742,7 @@ def make_excel(original_uploaded, original, processed, stats):
 
             if label in ("ป.โท", "ป.เอก"):
                 row_fill = red_fill
-            elif re.fullmatch(r"\\d{4}", label):
+            elif re.fullmatch(r"\d{4}", label):
                 row_fill = white_fill
             else:
                 row_fill = pink_fill
