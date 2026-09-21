@@ -688,11 +688,49 @@ def make_excel(original_uploaded, original, processed, stats):
         if len(aggregate_df):
             sws.auto_filter.ref = f"A3:AN{needed}"
 
-    faculty_stats = build_aggregate_stats("คณะ")
-    year_stats = build_aggregate_stats("ปีที่เข้า")
+    # แยกเป็น 4 Sheet ตามระดับและมิติ
+    # 1. ป.โท คณะ
+    # 2. ป.โท ปี
+    # 3. ป.เอก คณะ
+    # 4. ป.เอก ปี
+    for level_name, level_value in [("ป.โท", "ป.โท"), ("ป.เอก", "ป.เอก")]:
+        level_data = processed[processed["ระดับ"] == level_value].copy()
 
-    write_scale_sheet("สเกลคณะ", faculty_stats)
-    write_scale_sheet("สเกลปี", year_stats)
+        faculty_stats = build_aggregate_stats("คณะ") if not level_data.empty else pd.DataFrame(columns=stats.columns)
+        year_stats = build_aggregate_stats("ปีที่เข้า") if not level_data.empty else pd.DataFrame(columns=stats.columns)
+
+        # build_aggregate_stats ใช้ processed ทั้งชุด จึงกรองภายในฟังก์ชันด้วยระดับก่อนเขียน
+        if not level_data.empty:
+            def build_level_aggregate(group_col, data=level_data):
+                grouped = data.groupby(group_col, dropna=False, sort=True)
+                result = []
+                for key, group in grouped:
+                    label = clean_text(key)
+                    if not label:
+                        continue
+                    limit = 2 if level_value == "ป.โท" else 4
+                    result.append(metric_row(label, group, limit, durations))
+
+                total = metric_row("รวมทั้งหมด", data, 2 if level_value == "ป.โท" else 4, durations)
+                grads = data[data["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"]
+                if "รหัสนิสิต" in grads.columns:
+                    total["จำนวนนิสิตจบ_ทั้งหมด"] = grads["รหัสนิสิต"].map(clean_text).replace("", pd.NA).dropna().nunique()
+                    total["จำนวนนิสิตจบ_ตามหลักสูตร"] = grads.loc[
+                        grads["ระยะเวลา(ปี)"] <= (2 if level_value == "ป.โท" else 4), "รหัสนิสิต"
+                    ].map(clean_text).replace("", pd.NA).dropna().nunique()
+                    total["%จบตามเวลา"] = (
+                        total["จำนวนนิสิตจบ_ตามหลักสูตร"] * 100 /
+                        total["จำนวนนิสิตที่ไม่นับสถานะ"]
+                        if total["จำนวนนิสิตที่ไม่นับสถานะ"] else 0
+                    )
+                result.append(total)
+                return pd.DataFrame(result, columns=stats.columns)
+
+            faculty_stats = build_level_aggregate("คณะ")
+            year_stats = build_level_aggregate("ปีที่เข้า")
+
+        write_scale_sheet(f"{level_name} คณะ", faculty_stats)
+        write_scale_sheet(f"{level_name} ปี", year_stats)
 
     out = io.BytesIO()
     wb.save(out)
