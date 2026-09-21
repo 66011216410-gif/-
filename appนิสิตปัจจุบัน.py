@@ -112,10 +112,17 @@ def metric_row(label, g, limit, durations):
     valid_duration = valid["ระยะเวลา(ปี)"].dropna()
 
     # สถิติเดิม
-    r["จำนวนนิสิตจบ_ทั้งหมด"] = len(grads)
-    r["จำนวนนิสิตจบ_ตามหลักสูตร"] = int(
-        (grads["ระยะเวลา(ปี)"] <= limit).sum()
-    )
+    # นับเป็น "จำนวนนิสิต" โดยนับรหัสนิสิตไม่ซ้ำ
+    # เพื่อไม่ให้นิสิตคนเดียวที่มีหลายรายการถูกนับซ้ำ
+    if "รหัสนิสิต" in grads.columns:
+        r["จำนวนนิสิตจบ_ทั้งหมด"] = grads["รหัสนิสิต"].map(clean_text).replace("", pd.NA).dropna().nunique()
+        on_time = grads[grads["ระยะเวลา(ปี)"] <= limit]
+        r["จำนวนนิสิตจบ_ตามหลักสูตร"] = on_time["รหัสนิสิต"].map(clean_text).replace("", pd.NA).dropna().nunique()
+    else:
+        r["จำนวนนิสิตจบ_ทั้งหมด"] = len(grads)
+        r["จำนวนนิสิตจบ_ตามหลักสูตร"] = int(
+            (grads["ระยะเวลา(ปี)"] <= limit).sum()
+        )
 
     # สถิติ 4 ช่องใหม่
     r["จำนวนนิสิตที่ไม่นับสถานะ"] = len(valid)
