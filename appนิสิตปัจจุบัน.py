@@ -724,8 +724,8 @@ def make_excel(original_uploaded, original, processed, stats):
                 cell.border = border
 
             # ยืนยันการเขียน AL:AN จากชื่อคอลัมน์โดยตรง
-            sws.cell(i, 38).value = row["จำนวนนิสิตที่ไม่นับสถานะ"]
-            sws.cell(i, 39).value = row["ตามระยะเวลาของหลักสูตร 2 ปี/ 4 ปี (คน)"]
+            sws.cell(i, 38).value = row["จำนวนนิสิตที่ไม่นับสถานะ เสียชีวิต พ้นสภาพ ลาออก พ้นสภาพ (คณบดีอนุมัติ)"]
+            sws.cell(i, 39).value = row["จำนวนนิสิตจบ_ตามหลักสูตร"]
             sws.cell(i, 40).value = row["%จบตามเวลา"]
 
             sws.cell(i, 36).number_format = "0.00"
