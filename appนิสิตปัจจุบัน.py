@@ -164,11 +164,17 @@ def metric_row(label, g, limit, durations):
     # สูตรที่กำหนด:
     # จำนวนนิสิตที่ไม่นับสถานะ
     # = จำนวนนิสิตรับเข้า - พ้นสภาพ(เสียชีวิต) - พ้นสภาพ - ลาออก
-    death_count = int((g["สถานะกลุ่ม"] == "พ้นสภาพ (เสียชีวิต)").sum())
-    dropout_status_count = int((g["สถานะกลุ่ม"] == "พ้นสภาพ").sum())
-    resign_count = int((g["สถานะกลุ่ม"] == "ลาออก").sum())
-    excluded_count = death_count + dropout_status_count + resign_count
+    # "ลาออก" ให้นับสถานะที่มีคำว่า "ลาออก" ในข้อมูลดิบด้วย
+    # รวม 37.3/38.3 ที่แสดงผลเป็น "พ้นสภาพ (คณบดีอนุมัติ)"
+    raw_status = g["สถานะนิสิต"].map(clean_text)
+    death_mask = g["สถานะกลุ่ม"] == "พ้นสภาพ (เสียชีวิต)"
+    dropout_mask = g["สถานะกลุ่ม"] == "พ้นสภาพ"
+    resign_mask = raw_status.str.contains("ลาออก", na=False)
+    excluded_mask = death_mask | dropout_mask | resign_mask
+    excluded_count = int(excluded_mask.sum())
     r["จำนวนนิสิตที่ไม่นับสถานะ"] = len(g) - excluded_count
+    valid = g[~excluded_mask]
+    valid_duration = valid["ระยะเวลา(ปี)"].dropna()
     r["เฉลี่ยระยะเวลาที่ใช้(ปี) ไม่นับรวมนิสิตสถานะ เสียชีวิต พ้นสภาพ ลาออก"] = (
         round(valid_duration.mean(), 2) if len(valid_duration) else 0
     )
