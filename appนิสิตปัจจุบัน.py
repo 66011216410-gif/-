@@ -197,8 +197,7 @@ def metric_row(label, g, limit, durations):
     )
 
     for stt in STATUS_DISPLAY:
-        if stt == "นิสิตปัจจุบัน":
-            continue
+        if stt == "นิสิตปัจจุบัน":            continue
         r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())
     r["พ้นสภาพคืนไม่ได้"] = int(
         (g["สถานะกลุ่ม"] == "พ้นสภาพคืนไม่ได้").sum()
@@ -398,7 +397,6 @@ def make_excel(original_uploaded, original, processed, stats):
         ws = wb["สถิติ"]
     else:
         ws = wb.create_sheet("สถิติ")
-
     # ============================================================
     # TEMPLATE SHEET "สถิติ"
     # ============================================================
@@ -597,8 +595,7 @@ def make_excel(original_uploaded, original, processed, stats):
 
         # ยืนยันการเขียน 3 คอลัมน์ท้าย AL:AN โดยอ้างอิงชื่อคอลัมน์โดยตรง
         # ไม่พึ่งตำแหน่งของ DataFrame
-        ws.cell(i, 38).value = row["จำนวนนิสิตที่ไม่นับสถานะ เสียชีวิต พ้นสภาพ ลาออก พ้นสภาพ (คณบดีอนุมัติ)"]
-        ws.cell(i, 39).value = row["ตามระยะเวลาของหลักสูตร 2 ปี/ 4 ปี (คน)"]
+        ws.cell(i, 38).value = row["จำนวนนิสิตที่ไม่นับสถานะ เสียชีวิต พ้นสภาพ ลาออก พ้นสภาพ (คณบดีอนุมัติ)"]        ws.cell(i, 39).value = row["ตามระยะเวลาของหลักสูตร 2 ปี/ 4 ปี (คน)"]
         ws.cell(i, 40).value = row["%จบตามเวลา"]
 
         # ตัวเลขระยะเวลาเฉลี่ยและ % แสดง 2 ตำแหน่ง
@@ -750,18 +747,22 @@ if uploaded:
             df["สถานะนิสิต"].astype(str).str.strip().isin(current_statuses)
         ].copy()
 
-        # ป.โท / ป.เอก นับจากคอลัมน์ "ระดับ"
+        # ไทย / ต่างชาติ และแยกตามระดับปริญญา
+        nationality_norm = current_df["ไทย-ต่างชาติ"].astype(str).str.strip()
         level_norm = current_df["ระดับ"].map(normalize_level)
-        master_count = int((level_norm == "ป.โท").sum())
-        doctoral_count = int((level_norm == "ป.เอก").sum())
 
-        # ไทย / ต่างชาติ นับจากคอลัมน์ "ไทย-ต่างชาติ"
-        thai_count = int(
-            (current_df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ไทย").sum()
-        )
-        foreign_count = int(
-            (current_df["ไทย-ต่างชาติ"].astype(str).str.strip() == "ต่างชาติ").sum()
-        )
+        thai_mask = nationality_norm == "ไทย"
+        foreign_mask = nationality_norm == "ต่างชาติ"
+        master_mask = level_norm == "ป.โท"
+        doctoral_mask = level_norm == "ป.เอก"
+
+        thai_count = int(thai_mask.sum())
+        thai_master_count = int((thai_mask & master_mask).sum())
+        thai_doctoral_count = int((thai_mask & doctoral_mask).sum())
+
+        foreign_count = int(foreign_mask.sum())
+        foreign_master_count = int((foreign_mask & master_mask).sum())
+        foreign_doctoral_count = int((foreign_mask & doctoral_mask).sum())
 
         st.markdown(
             """
@@ -780,30 +781,46 @@ if uploaded:
             }
             .dashboard-label {
                 color: #0b2a4a;
-                font-size: 16px;
-                text-align: center;
-                line-height: 1.7;
-                margin-top: 18px;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        d1, d2, d3, d4 = st.columns(4)
-        dashboard_items = [
-            (master_count, "จำนวนนิสิต<br>ระดับปริญญาโท"),
-            (doctoral_count, "จำนวนนิสิต<br>ระดับปริญญาเอก"),
+               # แสดง 6 ตัวเลข: ไทยทั้งหมด/แยกปริญญา และต่างชาติทั้งหมด/แยกปริญญา
+        d1, d2, d3 = st.columns(3)
+        dashboard_row1 = [
             (thai_count, "จำนวนนิสิต<br>ไทยทั้งหมด"),
-            (foreign_count, "จำนวนนิสิต<br>ต่างชาติทั้งหมด"),
+            (thai_master_count, "จำนวนนิสิตไทย<br>ระดับปริญญาโท"),
+            (thai_doctoral_count, "จำนวนนิสิตไทย<br>ระดับปริญญาเอก"),
         ]
 
-        for col, (value, label) in zip((d1, d2, d3, d4), dashboard_items):
+        for col, (value, label) in zip((d1, d2, d3), dashboard_row1):
             with col:
                 st.markdown(
                     f'''
                     <div class="dashboard-box">
                         <div class="dashboard-number">{value:,}</div>
+                        <div class="dashboard-label">{label}</div>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True,
+                )
+
+        d4, d5, d6 = st.columns(3)
+        dashboard_row2 = [
+            (foreign_count, "จำนวนนิสิต<br>ต่างชาติทั้งหมด"),
+            (foreign_master_count, "จำนวนนิสิตต่างชาติ<br>ระดับปริญญาโท"),
+            (foreign_doctoral_count, "จำนวนนิสิตต่างชาติ<br>ระดับปริญญาเอก"),
+        ]
+
+        for col, (value, label) in zip((d4, d5, d6), dashboard_row2):
+            with col:
+                st.markdown(
+                    f'''
+                    <div class="dashboard-box">
+                        <div class="dashboard-number">{value:,}</div>
+                        <div class="dashboard-label">{label}</div>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True,
+                )
+
+ <div class="dashboard-number">{value:,}</div>
                         <div class="dashboard-label">{label}</div>
                     </div>
                     ''',
