@@ -1,6 +1,7 @@
 import io
 import re
 from copy import copy
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -764,70 +765,111 @@ if uploaded:
         foreign_master_count = int((foreign_mask & master_mask).sum())
         foreign_doctoral_count = int((foreign_mask & doctoral_mask).sum())
 
+        total_current_count = int(len(current_df))
+        master_total_count = int(master_mask.sum())
+        doctoral_total_count = int(doctoral_mask.sum())
+
+        thai_months = [
+            "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+            "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+        ]
+        now = datetime.now()
+        dashboard_date = f"{now.day} {thai_months[now.month - 1]} {now.year + 543}"
+
         st.markdown(
             """
             <style>
-            .dashboard-box {
-                background: rgba(243, 247, 252, 0.94);
-                padding: 18px 10px 22px 10px;
-                margin-bottom: 18px;
+            .dashboard-card {
+                background: #f3f7fc;
+                padding: 8px 8px 20px 8px;
+                min-height: 120px;
             }
             .dashboard-number {
                 color: #0b2a4a;
                 font-size: 42px;
                 font-weight: 700;
                 text-align: center;
-                line-height: 1.1;
+                line-height: 1.05;
             }
             .dashboard-label {
                 color: #0b2a4a;
                 font-size: 16px;
                 text-align: center;
-                line-height: 1.7;
-                margin-top: 18px;
+                line-height: 1.65;
+                margin-top: 16px;
+            }
+            .dashboard-panel {
+                background: #0b2f50;
+                color: white;
+                padding: 34px 42px 38px 42px;
+                margin: 8px 0 0 0;
+                min-height: 390px;
+            }
+            .dashboard-panel h2 {
+                color: white;
+                font-size: 28px;
+                margin: 0 0 10px 0;
+            }
+            .dashboard-date {
+                color: white;
+                font-size: 16px;
+                font-style: italic;
+                margin-bottom: 24px;
+            }
+            .dashboard-panel ul {
+                margin-top: 0;
+                padding-left: 22px;
+            }
+            .dashboard-panel li {
+                color: white;
+                font-size: 16px;
+                line-height: 2.0;
+                margin-bottom: 7px;
             }
             </style>
             """,
             unsafe_allow_html=True,
         )
 
-        # แสดง 6 ตัวเลข: ไทยทั้งหมด/แยกปริญญา และต่างชาติทั้งหมด/แยกปริญญา
-        d1, d2, d3 = st.columns(3)
-        dashboard_row1 = [
+        # Dashboard 4 ตัวเลขด้านบน + กล่องสรุปข้อมูลด้านล่าง
+        top_cards = [
+            (master_total_count, "จำนวนนิสิต<br>ระดับปริญญาโท"),
+            (doctoral_total_count, "จำนวนนิสิต<br>ระดับปริญญาเอก"),
             (thai_count, "จำนวนนิสิต<br>ไทยทั้งหมด"),
-            (thai_master_count, "จำนวนนิสิตไทย<br>ระดับปริญญาโท"),
-            (thai_doctoral_count, "จำนวนนิสิตไทย<br>ระดับปริญญาเอก"),
-        ]
-
-        for col, (value, label) in zip((d1, d2, d3), dashboard_row1):
-            with col:                st.markdown(
-                    f'''
-                    <div class="dashboard-box">
-                        <div class="dashboard-number">{value:,}</div>
-                        <div class="dashboard-label">{label}</div>
-                    </div>
-                    ''',
-                    unsafe_allow_html=True,
-                )
-
-        d4, d5, d6 = st.columns(3)
-        dashboard_row2 = [
             (foreign_count, "จำนวนนิสิต<br>ต่างชาติทั้งหมด"),
-            (foreign_master_count, "จำนวนนิสิตต่างชาติ<br>ระดับปริญญาโท"),
-            (foreign_doctoral_count, "จำนวนนิสิตต่างชาติ<br>ระดับปริญญาเอก"),
         ]
 
-        for col, (value, label) in zip((d4, d5, d6), dashboard_row2):
+        d1, d2, d3, d4 = st.columns(4)
+        for col, (value, label) in zip((d1, d2, d3, d4), top_cards):
             with col:
                 st.markdown(
                     f'''
-                    <div class="dashboard-box">
+                    <div class="dashboard-card">
                         <div class="dashboard-number">{value:,}</div>
                         <div class="dashboard-label">{label}</div>
                     </div>
                     ''',
                     unsafe_allow_html=True,
                 )
+
+        st.markdown(
+            f'''
+            <div class="dashboard-panel">
+                <h2>นิสิตระดับบัณฑิตศึกษา</h2>
+                <div class="dashboard-date">ข้อมูล ณ วันที่ {dashboard_date}</div>
+                <ul>
+                    <li>{total_current_count:,} จำนวนนิสิตทั้งหมด</li>
+                    <li>{thai_count:,} จำนวนนิสิตไทยทั้งหมด</li>
+                    <li>{thai_master_count:,} จำนวนนิสิตไทย ระดับปริญญาโท</li>
+                    <li>{thai_doctoral_count:,} จำนวนนิสิตไทย ระดับปริญญาเอก</li>
+                    <li>{foreign_count:,} จำนวนนิสิตต่างชาติทั้งหมด</li>
+                    <li>{foreign_master_count:,} จำนวนนิสิตต่างชาติ ระดับปริญญาโท</li>
+                    <li>{foreign_doctoral_count:,} จำนวนนิสิตต่างชาติ ระดับปริญญาเอก</li>
+                </ul>
+            </div>
+            ''',
+            unsafe_allow_html=True,
+        )
 
         with st.expander("ดูตัวอย่างข้อมูลที่นำเข้า"):
             st.dataframe(df.head(20), use_container_width=True)
