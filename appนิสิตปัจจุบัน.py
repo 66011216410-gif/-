@@ -595,11 +595,13 @@ def make_excel(original_uploaded, original, processed, stats):
 
         # ยืนยันการเขียน 3 คอลัมน์ท้าย AL:AN โดยอ้างอิงชื่อคอลัมน์โดยตรง
         # ไม่พึ่งตำแหน่งของ DataFrame
-        ws.cell(i, 38).value = row["จำนวนนิสิตที่ไม่นับสถานะ เสียชีวิต พ้นสภาพ ลาออก พ้นสภาพ (คณบดีอนุมัติ)"]        ws.cell(i, 39).value = row["ตามระยะเวลาของหลักสูตร 2 ปี/ 4 ปี (คน)"]
+        ws.cell(i, 38).value = row["จำนวนนิสิตที่ไม่นับสถานะ เสียชีวิต พ้นสภาพ ลาออก พ้นสภาพ (คณบดีอนุมัติ)"]
+        ws.cell(i, 39).value = row["ตามระยะเวลาของหลักสูตร 2 ปี/ 4 ปี (คน)"]
         ws.cell(i, 40).value = row["%จบตามเวลา"]
         # ตัวเลขระยะเวลาเฉลี่ยและ % แสดง 2 ตำแหน่ง
         ws.cell(i, 36).number_format = "0.00"
-        ws.cell(i, 37).number_format = "0.00"        ws.cell(i, 40).number_format = "0.00"
+        ws.cell(i, 37).number_format = "0.00"
+        ws.cell(i, 40).number_format = "0.00"
 
     # ล้างแถวที่เกินจากข้อมูลใหม่
     for r in range(needed_last + 1, old_last + 1):
