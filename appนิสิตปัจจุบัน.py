@@ -7,6 +7,39 @@ import streamlit as st
 
 st.set_page_config(page_title="ระบบสถิตินิสิตบัณฑิตศึกษา", page_icon="📊", layout="wide")
 
+
+# พื้นหลังเว็บจากภาพอาคาร — โหลดตั้งแต่เปิดหน้าเว็บ
+st.markdown(
+    """
+    <style>
+    .stApp,
+    div[data-testid="stAppViewContainer"] {
+        background: transparent !important;
+    }
+    body {
+        background: #ffffff !important;
+    }
+    .stApp::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("https://raw.githubusercontent.com/66011216410-gif/-/main/assets/building_bg.webp");
+        background-size: cover;
+        background-position: center center;
+        background-repeat: no-repeat;
+        opacity: 0.22;
+        z-index: 0;
+        pointer-events: none;
+    }
+    .stApp > div {
+        position: relative;
+        z-index: 1;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 REQUIRED_COLUMNS = [
     "ปีที่เข้า", "ภาคการศึกษาที่เข้า", "รหัสนิสิต", "คณะ", "วิทยาเขต", "สาขา",
     "ระดับ", "รหัสสถานะนิสิต", "สถานะนิสิต", "ปีที่จบ", "เทอมที่จบ", "วันที่จบ"
@@ -765,30 +798,6 @@ if uploaded:
         st.markdown(
             """
             <style>
-            /* พื้นหลังเว็บจากภาพอาคารตั้งแต่เปิดหน้าเว็บ */
-            .stApp,
-            div[data-testid="stAppViewContainer"] {
-                background: transparent !important;
-            }
-            body {
-                background: #ffffff !important;
-            }
-            .stApp::before {
-                content: "";
-                position: fixed;
-                inset: 0;
-                background-image: url("https://raw.githubusercontent.com/66011216410-gif/-/main/assets/building_bg.webp");
-                background-size: cover;
-                background-position: center center;
-                background-repeat: no-repeat;
-                opacity: 0.22;
-                z-index: 0;
-                pointer-events: none;
-            }
-            .stApp > div {
-                position: relative;
-                z-index: 1;
-            }
             .dashboard-box {
                 background: rgba(243, 247, 252, 0.94);
                 padding: 18px 10px 22px 10px;
@@ -809,6 +818,10 @@ if uploaded:
                 margin-top: 18px;
             }
             </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
             """,
             unsafe_allow_html=True,
         )
