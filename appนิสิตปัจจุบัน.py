@@ -734,6 +734,10 @@ def make_excel(original_uploaded, original, processed, stats):
 st.markdown(
     """
     <style>
+    /* พื้นหลังเว็บไซต์สีเทาไล่โทน */
+    .stApp {
+        background: linear-gradient(135deg, #f5f5f5 0%, #e2e4e7 45%, #c8ccd1 100%);
+    }
     .main-title {
         background: linear-gradient(135deg, #0b2f50 0%, #174a73 100%);
         color: white;
