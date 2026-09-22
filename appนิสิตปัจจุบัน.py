@@ -27,7 +27,7 @@ st.markdown(
         background-size: cover;
         background-position: center center;
         background-repeat: no-repeat;
-        opacity: 0.22;
+        opacity: 0.38;
         z-index: 0;
         pointer-events: none;
     }
