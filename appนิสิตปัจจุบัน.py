@@ -197,8 +197,7 @@ def metric_row(label, g, limit, durations):
     )
 
     for stt in STATUS_DISPLAY:
-        if stt == "นิสิตปัจจุบัน":            continue
-        r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())
+        if stt == "นิสิตปัจจุบัน":            continue        r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())
     r["พ้นสภาพคืนไม่ได้"] = int(
         (g["สถานะกลุ่ม"] == "พ้นสภาพคืนไม่ได้").sum()
     )
@@ -397,8 +396,7 @@ def make_excel(original_uploaded, original, processed, stats):
         ws = wb["สถิติ"]
     else:
         ws = wb.create_sheet("สถิติ")
-    # ============================================================
-    # TEMPLATE SHEET "สถิติ"
+    # ============================================================    # TEMPLATE SHEET "สถิติ"
     # ============================================================
     gray = PatternFill(fill_type="solid", fgColor="808080")
     red_fill = PatternFill(fill_type="solid", fgColor="FF0000")
@@ -597,7 +595,6 @@ def make_excel(original_uploaded, original, processed, stats):
         # ไม่พึ่งตำแหน่งของ DataFrame
         ws.cell(i, 38).value = row["จำนวนนิสิตที่ไม่นับสถานะ เสียชีวิต พ้นสภาพ ลาออก พ้นสภาพ (คณบดีอนุมัติ)"]        ws.cell(i, 39).value = row["ตามระยะเวลาของหลักสูตร 2 ปี/ 4 ปี (คน)"]
         ws.cell(i, 40).value = row["%จบตามเวลา"]
-
         # ตัวเลขระยะเวลาเฉลี่ยและ % แสดง 2 ตำแหน่ง
         ws.cell(i, 36).number_format = "0.00"
         ws.cell(i, 37).number_format = "0.00"
@@ -781,7 +778,17 @@ if uploaded:
             }
             .dashboard-label {
                 color: #0b2a4a;
-               # แสดง 6 ตัวเลข: ไทยทั้งหมด/แยกปริญญา และต่างชาติทั้งหมด/แยกปริญญา
+                font-size: 16px;
+                text-align: center;
+                line-height: 1.7;
+                margin-top: 18px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # แสดง 6 ตัวเลข: ไทยทั้งหมด/แยกปริญญา และต่างชาติทั้งหมด/แยกปริญญา
         d1, d2, d3 = st.columns(3)
         dashboard_row1 = [
             (thai_count, "จำนวนนิสิต<br>ไทยทั้งหมด"),
@@ -814,13 +821,6 @@ if uploaded:
                     f'''
                     <div class="dashboard-box">
                         <div class="dashboard-number">{value:,}</div>
-                        <div class="dashboard-label">{label}</div>
-                    </div>
-                    ''',
-                    unsafe_allow_html=True,
-                )
-
- <div class="dashboard-number">{value:,}</div>
                         <div class="dashboard-label">{label}</div>
                     </div>
                     ''',
