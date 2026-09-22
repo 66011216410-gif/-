@@ -822,10 +822,6 @@ if uploaded:
             unsafe_allow_html=True,
         )
 
-            """,
-            unsafe_allow_html=True,
-        )
-
         d1, d2, d3, d4 = st.columns(4)
         dashboard_items = [
             (master_count, "จำนวนนิสิต<br>ระดับปริญญาโท"),
