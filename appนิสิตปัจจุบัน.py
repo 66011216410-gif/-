@@ -1016,17 +1016,6 @@ if "stats" in st.session_state:
 
     st.markdown('<div class="result-header"><h2>📈 ผลสถิติ</h2></div>', unsafe_allow_html=True)
 
-    a, b, c = st.columns(3)
-    a.metric("แถวสถิติ", f"{len(stats):,}")
-    b.metric(
-        "ผู้สำเร็จการศึกษา",
-        f"{(processed['สถานะกลุ่ม'] == 'สำเร็จการศึกษา').sum():,}",
-    )
-    c.metric(
-        "ระยะเวลาเฉลี่ย",
-        f"{processed['ระยะเวลา(ปี)'].mean():.2f} ปี",
-    )
-
     # ป้องกัน pyarrow/Streamlit ValueError จากชื่อคอลัมน์ซ้ำ
     display_stats = stats.loc[
         :, ~stats.columns.duplicated(keep="last")
