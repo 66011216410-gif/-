@@ -1016,7 +1016,7 @@ if "stats" in st.session_state:
 
     st.markdown('<div class="result-header"><h2>📈 ผลสถิติ</h2></div>', unsafe_allow_html=True)
 
-    a, b, c, d = st.columns(4)
+    a, b, c = st.columns(3)
     a.metric("แถวสถิติ", f"{len(stats):,}")
     b.metric(
         "ผู้สำเร็จการศึกษา",
@@ -1025,10 +1025,6 @@ if "stats" in st.session_state:
     c.metric(
         "ระยะเวลาเฉลี่ย",
         f"{processed['ระยะเวลา(ปี)'].mean():.2f} ปี",
-    )
-    d.metric(
-        "ข้อมูลที่คำนวณระยะเวลาได้",
-        f"{processed['ระยะเวลา(ปี)'].notna().sum():,}",
     )
 
     # ป้องกัน pyarrow/Streamlit ValueError จากชื่อคอลัมน์ซ้ำ
