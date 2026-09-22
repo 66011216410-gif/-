@@ -410,7 +410,8 @@ def make_excel(original_uploaded, original, processed, stats):
     else:
         ws = wb.create_sheet("สถิติ")
     # ============================================================    # TEMPLATE SHEET "สถิติ"
-    # ============================================================    gray = PatternFill(fill_type="solid", fgColor="808080")
+    # ============================================================
+    gray = PatternFill(fill_type="solid", fgColor="808080")
     red_fill = PatternFill(fill_type="solid", fgColor="FF0000")
     pink_fill = PatternFill(fill_type="solid", fgColor="FF99CC")
     green_fill = PatternFill(fill_type="solid", fgColor="A9D18E")
