@@ -785,15 +785,33 @@ st.markdown(
         padding: 10px;
     }
     div.stButton > button[kind="primary"] {
-        background: #0b2f50;
+        background: #f8ad19;
+        color: #0b2f50;
         border: none;
         border-radius: 10px;
         min-height: 48px;
         font-size: 17px;
         font-weight: 700;
+        box-shadow: 0 4px 12px rgba(248,173,25,.25);
     }
     div.stButton > button[kind="primary"]:hover {
-        background: #174a73;
+        background: #e99d0d;
+        color: #0b2f50;
+        border: none;
+    }
+    div[data-testid="stDownloadButton"] > button {
+        background: #f8ad19;
+        color: #0b2f50;
+        border: none;
+        border-radius: 10px;
+        min-height: 48px;
+        font-size: 17px;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(248,173,25,.25);
+    }
+    div[data-testid="stDownloadButton"] > button:hover {
+        background: #e99d0d;
+        color: #0b2f50;
         border: none;
     }
     </style>
