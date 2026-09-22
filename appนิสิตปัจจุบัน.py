@@ -199,7 +199,9 @@ def metric_row(label, g, limit, durations):
     for stt in STATUS_DISPLAY:
         if stt == "นิสิตปัจจุบัน":
             continue
-        r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())    r["พ้นสภาพคืนไม่ได้"] = int(
+        r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())
+
+    r["พ้นสภาพคืนไม่ได้"] = int(
         (g["สถานะกลุ่ม"] == "พ้นสภาพคืนไม่ได้").sum()
     )
     return r
