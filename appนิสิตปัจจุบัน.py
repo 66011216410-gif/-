@@ -8,6 +8,9 @@ import streamlit as st
 
 st.set_page_config(page_title="ระบบสถิตินิสิตบัณฑิตศึกษา", page_icon="📊", layout="wide")
 
+# โลโก้ Graduate School
+st.image("logo_msu.svg", width=240)
+
 
 REQUIRED_COLUMNS = [
     "ปีที่เข้า", "ภาคการศึกษาที่เข้า", "รหัสนิสิต", "คณะ", "วิทยาเขต", "สาขา",
