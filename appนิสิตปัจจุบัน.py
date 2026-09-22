@@ -129,12 +129,21 @@ def cut_plan_type(x):
 
 
 def read_excel(uploaded):
-    df = pd.read_excel(uploaded, sheet_name="ข้อมูลนิสิต")
-    df.columns = [clean_text(c) for c in df.columns]
-    missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
-    if missing:
-        raise ValueError("ไม่พบคอลัมน์ที่จำเป็น: " + ", ".join(missing))
-    return df
+    # ไม่บังคับชื่อ Sheet: ค้นหา Sheet ใดก็ได้ที่มีคอลัมน์ข้อมูลนิสิตครบ
+    sheets = pd.read_excel(uploaded, sheet_name=None)
+    for sheet_name, sheet_df in sheets.items():
+        sheet_df.columns = [clean_text(c) for c in sheet_df.columns]
+        if all(c in sheet_df.columns for c in REQUIRED_COLUMNS):
+            return sheet_df
+
+    # หากไม่พบ Sheet ที่ตรง ให้แจ้งคอลัมน์ที่ต้องมี
+    available = []
+    for sheet_name, sheet_df in sheets.items():
+        available.append(f"{sheet_name}: {', '.join(map(str, sheet_df.columns))}")
+    raise ValueError(
+        "ไม่พบ Sheet ที่มีคอลัมน์ข้อมูลนิสิตครบ ระบบไม่บังคับชื่อ Sheet "
+        "แต่ต้องมีคอลัมน์: " + ", ".join(REQUIRED_COLUMNS)
+    )
 
 
 def metric_row(label, g, limit, durations):
