@@ -197,8 +197,9 @@ def metric_row(label, g, limit, durations):
     )
 
     for stt in STATUS_DISPLAY:
-        if stt == "นิสิตปัจจุบัน":            continue        r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())
-    r["พ้นสภาพคืนไม่ได้"] = int(
+        if stt == "นิสิตปัจจุบัน":
+            continue
+        r[stt] = int((g["สถานะกลุ่ม"] == stt).sum())    r["พ้นสภาพคืนไม่ได้"] = int(
         (g["สถานะกลุ่ม"] == "พ้นสภาพคืนไม่ได้").sum()
     )
     return r
@@ -397,8 +398,7 @@ def make_excel(original_uploaded, original, processed, stats):
     else:
         ws = wb.create_sheet("สถิติ")
     # ============================================================    # TEMPLATE SHEET "สถิติ"
-    # ============================================================
-    gray = PatternFill(fill_type="solid", fgColor="808080")
+    # ============================================================    gray = PatternFill(fill_type="solid", fgColor="808080")
     red_fill = PatternFill(fill_type="solid", fgColor="FF0000")
     pink_fill = PatternFill(fill_type="solid", fgColor="FF99CC")
     green_fill = PatternFill(fill_type="solid", fgColor="A9D18E")
@@ -597,8 +597,7 @@ def make_excel(original_uploaded, original, processed, stats):
         ws.cell(i, 40).value = row["%จบตามเวลา"]
         # ตัวเลขระยะเวลาเฉลี่ยและ % แสดง 2 ตำแหน่ง
         ws.cell(i, 36).number_format = "0.00"
-        ws.cell(i, 37).number_format = "0.00"
-        ws.cell(i, 40).number_format = "0.00"
+        ws.cell(i, 37).number_format = "0.00"        ws.cell(i, 40).number_format = "0.00"
 
     # ล้างแถวที่เกินจากข้อมูลใหม่
     for r in range(needed_last + 1, old_last + 1):
@@ -797,8 +796,7 @@ if uploaded:
         ]
 
         for col, (value, label) in zip((d1, d2, d3), dashboard_row1):
-            with col:
-                st.markdown(
+            with col:                st.markdown(
                     f'''
                     <div class="dashboard-box">
                         <div class="dashboard-number">{value:,}</div>
