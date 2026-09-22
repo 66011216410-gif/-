@@ -765,8 +765,17 @@ if uploaded:
         st.markdown(
             """
             <style>
+            /* พื้นหลังเว็บจากภาพอาคารแบบจาง ๆ */
+            .stApp {
+                background-image:
+                    linear-gradient(rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.90)),
+                    url("https://raw.githubusercontent.com/66011216410-gif/-/main/assets/building_bg.webp");
+                background-size: cover;
+                background-position: center top;
+                background-attachment: fixed;
+            }
             .dashboard-box {
-                background: #f3f7fc;
+                background: rgba(243, 247, 252, 0.94);
                 padding: 18px 10px 22px 10px;
                 margin-bottom: 18px;
             }
