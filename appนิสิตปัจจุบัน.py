@@ -12,7 +12,7 @@ st.set_page_config(page_title="ระบบสถิตินิสิตบั�
 st.markdown(
     """
     <style>
-    /* พื้นหลังเว็บจากภาพที่ผู้ใช้เลือก */
+    /* พื้นหลังเว็บจากภาพต้นฉบับความละเอียดสูง */
     html, body {
         background: transparent !important;
     }
@@ -27,7 +27,7 @@ st.markdown(
         background-size: cover;
         background-position: center center;
         background-repeat: no-repeat;
-        opacity: 0.30;
+        opacity: 0.38;
         z-index: 0;
         pointer-events: none;
     }
