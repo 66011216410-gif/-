@@ -730,13 +730,92 @@ def make_excel(original_uploaded, original, processed, stats):
     return out.getvalue()
 
 
-st.title("📊 ระบบประมวลผลสถิตินิสิต")
-st.caption("รูปแบบการทำงาน: Upload Excel → กดประมวลผล → สถิติทั้งหมดอัปเดต")
+st.markdown(
+    """
+    <style>
+    .main-title {
+        background: linear-gradient(135deg, #0b2f50 0%, #174a73 100%);
+        color: white;
+        padding: 28px 34px;
+        border-radius: 16px;
+        margin-bottom: 18px;
+        box-shadow: 0 8px 24px rgba(11,47,80,.14);
+    }
+    .main-title h1 {
+        color: white;
+        margin: 0;
+        font-size: 30px;
+        font-weight: 700;
+    }
+    .main-title p {
+        color: #dcecff;
+        margin: 8px 0 0 0;
+        font-size: 15px;
+    }
+    .section-title {
+        color: #0b2f50;
+        font-size: 22px;
+        font-weight: 700;
+        margin: 22px 0 10px 0;
+    }
+    .upload-note {
+        background: #f3f7fc;
+        border-left: 5px solid #2f6690;
+        padding: 14px 18px;
+        border-radius: 8px;
+        color: #29445c;
+        margin-bottom: 8px;
+    }
+    .result-header {
+        background: #0b2f50;
+        color: white;
+        padding: 18px 24px;
+        border-radius: 14px 14px 0 0;
+        margin-top: 24px;
+    }
+    .result-header h2 {
+        color: white;
+        margin: 0;
+        font-size: 22px;
+    }
+    div[data-testid="stFileUploader"] {
+        background: white;
+        border: 2px dashed #9bb6ce;
+        border-radius: 12px;
+        padding: 10px;
+    }
+    div.stButton > button[kind="primary"] {
+        background: #0b2f50;
+        border: none;
+        border-radius: 10px;
+        min-height: 48px;
+        font-size: 17px;
+        font-weight: 700;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        background: #174a73;
+        border: none;
+    }
+    </style>
+
+    <div class="main-title">
+        <h1>📊 ระบบสถิตินิสิตบัณฑิตศึกษา</h1>
+        <p>ระบบประมวลผลข้อมูลนิสิตและจัดทำสถิติอัตโนมัติ</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown('<div class="section-title">📁 นำเข้าข้อมูล</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="upload-note">รองรับไฟล์ Excel ทุกชื่อไฟล์ และระบบจะค้นหา Sheet ที่มีคอลัมน์ข้อมูลนิสิตที่จำเป็นให้อัตโนมัติ</div>',
+    unsafe_allow_html=True,
+)
 
 uploaded = st.file_uploader(
-    "1) อัปโหลดไฟล์ Excel",
+    "เลือกไฟล์ Excel",
     type=["xlsx", "xls"],
-    help="ไฟล์ควรมีชีตชื่อ 'ข้อมูลนิสิต'",
+    help="ชื่อไฟล์และชื่อ Sheet ไม่จำเป็นต้องกำหนดตายตัว",
 )
 
 if uploaded:
@@ -912,7 +991,7 @@ if "stats" in st.session_state:
     stats = st.session_state["stats"]
     processed = st.session_state["processed"]
 
-    st.subheader("ผลสถิติ")
+    st.markdown('<div class="result-header"><h2>📈 ผลสถิติ</h2></div>', unsafe_allow_html=True)
 
     a, b, c, d = st.columns(4)
     a.metric("แถวสถิติ", f"{len(stats):,}")
