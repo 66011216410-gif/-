@@ -1,9 +1,5 @@
 import io
-import json
-import os
 import re
-import urllib.error
-import urllib.request
 from copy import copy
 from datetime import datetime
 
@@ -833,81 +829,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ============================================================
-# ประวัติกราฟแนวโน้มนิสิตปัจจุบันแบบถาวร
-# เก็บไว้ใน GitHub เพื่อให้เปิดระบบรอบใหม่แล้วกราฟต่อจากเดิมได้
-# ตั้งค่า Streamlit Secret: GITHUB_TOKEN (สิทธิ์ Contents: Read and write)
-# ============================================================
-GITHUB_REPO = "66011216410-gif/-"
-HISTORY_PATH = "current_student_history.json"
-
-def load_persistent_history():
-    token = clean_text(st.secrets.get("GITHUB_TOKEN", "")) if hasattr(st, "secrets") else ""
-    if not token:
-        return []
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{HISTORY_PATH}?ref=main"
-    req = urllib.request.Request(
-        url,
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        raw = payload.get("content", "")
-        if raw:
-            import base64
-            return json.loads(base64.b64decode(raw).decode("utf-8"))
-    except Exception:
-        return []
-    return []
-
-
-def save_persistent_history(history):
-    token = clean_text(st.secrets.get("GITHUB_TOKEN", "")) if hasattr(st, "secrets") else ""
-    if not token:
-        return False
-    import base64
-    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{HISTORY_PATH}"
-    get_req = urllib.request.Request(
-        api_url + "?ref=main",
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
-    )
-    try:
-        with urllib.request.urlopen(get_req, timeout=10) as response:
-            existing = json.loads(response.read().decode("utf-8"))
-        file_sha = existing.get("sha")
-    except Exception:
-        file_sha = None
-
-    body = {
-        "message": "Update current student trend history",
-        "content": base64.b64encode(
-            json.dumps(history, ensure_ascii=False, indent=2).encode("utf-8")
-        ).decode("ascii"),
-        "branch": "main",
-    }
-    if file_sha:
-        body["sha"] = file_sha
-    put_req = urllib.request.Request(
-        api_url,
-        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "Content-Type": "application/json",
-        },
-        method="PUT",
-    )
-    try:
-        with urllib.request.urlopen(put_req, timeout=15) as response:
-            return 200 <= response.status < 300
-    except Exception:
-        return False
-
-
-if "current_student_history" not in st.session_state:
-    st.session_state["current_student_history"] = load_persistent_history()
-
 st.markdown('<div class="section-title">📁 นำเข้าข้อมูล</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="upload-note">รองรับไฟล์ Excel ทุกชื่อไฟล์ และระบบจะค้นหา Sheet ที่มีคอลัมน์ข้อมูลนิสิตที่จำเป็นให้อัตโนมัติ</div>',
@@ -920,19 +841,6 @@ uploaded = st.file_uploader(
     help="ชื่อไฟล์และชื่อ Sheet ไม่จำเป็นต้องกำหนดตายตัว",
 )
 
-# ============================================================
-# กราฟแนวโน้มนิสิตปัจจุบัน — แสดงต่อจากส่วนแนบไฟล์
-# ============================================================
-history_upload = pd.DataFrame(st.session_state.get("current_student_history", []))
-if not history_upload.empty:
-    history_upload["เวลา"] = pd.to_datetime(history_upload["เวลา"], errors="coerce")
-    st.markdown(
-        '<div class="result-header"><h2>📊 แนวโน้มนิสิตปัจจุบัน</h2></div>',
-        unsafe_allow_html=True,
-    )
-    chart_data_upload = history_upload.set_index("ครั้งที่")[["นิสิตปัจจุบัน"]]
-    st.line_chart(chart_data_upload, use_container_width=True)
-    st.caption("กราฟนี้เก็บประวัติการประมวลผลไว้ใน GitHub และจะรันต่อจากข้อมูลเดิมเมื่อกลับมาใช้ระบบครั้งถัดไป")
 
 if uploaded:
     try:
@@ -1094,28 +1002,6 @@ if uploaded:
             st.session_state["stats"] = stats
             st.session_state["excel_bytes"] = excel_bytes
 
-            # บันทึกจำนวนนิสิตปัจจุบันของแต่ละครั้งที่กดประมวลผลแบบถาวร
-            current_statuses_for_history = {
-                "นิสิตปัจจุบัน สภาพสมบูรณ์",
-                "รักษาสภาพนิสิต",
-                "ลาพักการเรียน",
-            }
-            current_count_for_history = int(
-                df["สถานะนิสิต"].astype(str).str.strip().isin(
-                    current_statuses_for_history
-                ).sum()
-            )
-            history = st.session_state["current_student_history"]
-            history.append(
-                {
-                    "ครั้งที่": len(history) + 1,
-                    "เวลา": datetime.now().isoformat(timespec="seconds"),
-                    "นิสิตปัจจุบัน": current_count_for_history,
-                }
-            )
-            st.session_state["current_student_history"] = history
-            if not save_persistent_history(history):
-                st.warning("ยังไม่ได้บันทึกกราฟถาวร: กรุณาตั้งค่า GITHUB_TOKEN ใน Streamlit Secrets")
 
             st.success(
                 "ประมวลผลเสร็จแล้ว — สถิติอัปเดตเรียบร้อย "
