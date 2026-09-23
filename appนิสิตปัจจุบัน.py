@@ -920,6 +920,20 @@ uploaded = st.file_uploader(
     help="ชื่อไฟล์และชื่อ Sheet ไม่จำเป็นต้องกำหนดตายตัว",
 )
 
+# ============================================================
+# กราฟแนวโน้มนิสิตปัจจุบัน — แสดงต่อจากส่วนแนบไฟล์
+# ============================================================
+history_upload = pd.DataFrame(st.session_state.get("current_student_history", []))
+if not history_upload.empty:
+    history_upload["เวลา"] = pd.to_datetime(history_upload["เวลา"], errors="coerce")
+    st.markdown(
+        '<div class="result-header"><h2>📊 แนวโน้มนิสิตปัจจุบัน</h2></div>',
+        unsafe_allow_html=True,
+    )
+    chart_data_upload = history_upload.set_index("ครั้งที่")[["นิสิตปัจจุบัน"]]
+    st.line_chart(chart_data_upload, use_container_width=True)
+    st.caption("กราฟนี้เก็บประวัติการประมวลผลไว้ใน GitHub และจะรันต่อจากข้อมูลเดิมเมื่อกลับมาใช้ระบบครั้งถัดไป")
+
 if uploaded:
     try:
         df = read_excel(uploaded)
@@ -1117,30 +1131,6 @@ if "stats" in st.session_state:
     processed = st.session_state["processed"]
 
     st.markdown('<div class="result-header"><h2>📈 ผลสถิติ</h2></div>', unsafe_allow_html=True)
-
-    # ============================================================
-    # กราฟแนวโน้มนิสิตปัจจุบัน — แสดงหน้าแนบไฟล์
-    # ============================================================
-    history = pd.DataFrame(st.session_state.get("current_student_history", []))
-    if not history.empty:
-        history["เวลา"] = pd.to_datetime(history["เวลา"], errors="coerce")
-        history["ครั้งที่"] = pd.to_numeric(history["ครั้งที่"], errors="coerce").astype("Int64")
-        st.markdown(
-            '<div class="result-header"><h2>📊 แนวโน้มนิสิตปัจจุบัน</h2></div>',
-            unsafe_allow_html=True,
-        )
-        chart_data = history.set_index("ครั้งที่")[["นิสิตปัจจุบัน"]]
-        st.line_chart(chart_data, use_container_width=True)
-
-        history_display = history.copy()
-        history_display["เวลา"] = history_display["เวลา"].dt.strftime(
-            "%d/%m/%Y %H:%M"
-        )
-        st.dataframe(
-            history_display,
-            use_container_width=True,
-            hide_index=True,
-        )
 
     # ป้องกัน pyarrow/Streamlit ValueError จากชื่อคอลัมน์ซ้ำ
     display_stats = stats.loc[
