@@ -829,6 +829,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ประวัติการประมวลผลสำหรับกราฟแนวโน้มใน Session นี้
+if "current_student_history" not in st.session_state:
+    st.session_state["current_student_history"] = []
+
 st.markdown('<div class="section-title">📁 นำเข้าข้อมูล</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="upload-note">รองรับไฟล์ Excel ทุกชื่อไฟล์ และระบบจะค้นหา Sheet ที่มีคอลัมน์ข้อมูลนิสิตที่จำเป็นให้อัตโนมัติ</div>',
@@ -1001,6 +1005,25 @@ if uploaded:
             st.session_state["stats"] = stats
             st.session_state["excel_bytes"] = excel_bytes
 
+            # บันทึกจำนวนนิสิตปัจจุบันของแต่ละครั้งที่กดประมวลผล
+            current_statuses_for_history = {
+                "นิสิตปัจจุบัน สภาพสมบูรณ์",
+                "รักษาสภาพนิสิต",
+                "ลาพักการเรียน",
+            }
+            current_count_for_history = int(
+                df["สถานะนิสิต"].astype(str).str.strip().isin(
+                    current_statuses_for_history
+                ).sum()
+            )
+            st.session_state["current_student_history"].append(
+                {
+                    "ครั้งที่": len(st.session_state["current_student_history"]) + 1,
+                    "เวลา": datetime.now(),
+                    "นิสิตปัจจุบัน": current_count_for_history,
+                }
+            )
+
             st.success(
                 "ประมวลผลเสร็จแล้ว — สถิติอัปเดตเรียบร้อย "
                 "โดยคงสีและรูปแบบของ Sheet สถิติเดิม"
@@ -1015,6 +1038,28 @@ if "stats" in st.session_state:
     processed = st.session_state["processed"]
 
     st.markdown('<div class="result-header"><h2>📈 ผลสถิติ</h2></div>', unsafe_allow_html=True)
+
+    # ============================================================
+    # กราฟแนวโน้มนิสิตปัจจุบันจากแต่ละครั้งที่ประมวลผล
+    # ============================================================
+    history = pd.DataFrame(st.session_state.get("current_student_history", []))
+    if not history.empty:
+        st.markdown(
+            '<div class="result-header"><h2>📊 แนวโน้มนิสิตปัจจุบัน</h2></div>',
+            unsafe_allow_html=True,
+        )
+        chart_data = history.set_index("ครั้งที่")[["นิสิตปัจจุบัน"]]
+        st.line_chart(chart_data, use_container_width=True)
+
+        history_display = history.copy()
+        history_display["เวลา"] = history_display["เวลา"].dt.strftime(
+            "%d/%m/%Y %H:%M"
+        )
+        st.dataframe(
+            history_display,
+            use_container_width=True,
+            hide_index=True,
+        )
 
     # ป้องกัน pyarrow/Streamlit ValueError จากชื่อคอลัมน์ซ้ำ
     display_stats = stats.loc[
