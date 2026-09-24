@@ -835,17 +835,24 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-uploaded = st.file_uploader(
-    "เลือกไฟล์ Excel",
+uploaded_files = st.file_uploader(
+    "เลือกไฟล์ Excel ได้หลายไฟล์",
     type=["xlsx", "xls"],
-    help="ชื่อไฟล์และชื่อ Sheet ไม่จำเป็นต้องกำหนดตายตัว",
+    accept_multiple_files=True,
+    help="เลือกได้หลายไฟล์ ระบบจะรวมข้อมูลทุกไฟล์แล้วสร้าง Excel ผลลัพธ์รวมเป็นไฟล์เดียว",
 )
 
 
-if uploaded:
+if uploaded_files:
     try:
-        df = read_excel(uploaded)
-        st.success(f"อ่านข้อมูลสำเร็จ: {len(df):,} รายการ")
+        dataframes = []
+        for uploaded_file in uploaded_files:
+            file_df = read_excel(uploaded_file)
+            file_df["__ไฟล์ต้นทาง"] = uploaded_file.name
+            dataframes.append(file_df)
+
+        df = pd.concat(dataframes, ignore_index=True)
+        st.success(f"อ่านข้อมูลสำเร็จ {len(uploaded_files):,} ไฟล์ รวม {len(df):,} รายการ")
 
         # ============================================================
         # DASHBOARD — ข้อมูลนิสิตปัจจุบัน
@@ -995,7 +1002,7 @@ if uploaded:
             with st.spinner("กำลังประมวลผลข้อมูลและสร้างสถิติ..."):
                 processed, stats = build_stats(df)
                 excel_bytes = make_excel(
-                    uploaded, df, processed, stats
+                    uploaded_files[0], df, processed, stats
                 )
 
             st.session_state["processed"] = processed
@@ -1030,9 +1037,9 @@ if "stats" in st.session_state:
     )
 
     st.download_button(
-        "⬇️ 3) ดาวน์โหลด Excel ผลลัพธ์",
+        "⬇️ 3) ดาวน์โหลด Excel รวมทุกไฟล์",
         data=st.session_state["excel_bytes"],
-        file_name="สถิตินิสิต_ประมวลผลแล้ว.xlsx",
+        file_name="สถิตินิสิต_รวมทุกไฟล์_ประมวลผลแล้ว.xlsx",
         mime=(
             "application/vnd.openxmlformats-officedocument."
             "spreadsheetml.sheet"
