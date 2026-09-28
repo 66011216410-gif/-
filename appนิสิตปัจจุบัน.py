@@ -169,6 +169,14 @@ def build_stats(df):
     non_graduated = work["สถานะนิสิต"].map(clean_text) != "สำเร็จการศึกษา"
     work.loc[non_graduated, ["ปีที่จบ", "เทอมที่จบ", "วันที่จบ"]] = pd.NA
     work["ระยะเวลา(ปี)"] = work.apply(calc_duration, axis=1)
+
+    # สร้างคอลัมน์ "จบตามเวลา": ป.โทไม่เกิน 2 ปี และ ป.เอกไม่เกิน 4 ปี
+    graduation_mask = work["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"
+    time_limit = work["ระดับ"].map({"ป.โท": 2, "ป.เอก": 4})
+    work["จบตามเวลา"] = ""
+    valid_duration = graduation_mask & work["ระยะเวลา(ปี)"].notna() & time_limit.notna()
+    work.loc[valid_duration & (work["ระยะเวลา(ปี)"] <= time_limit), "จบตามเวลา"] = "จบตามเวลา"
+    work.loc[valid_duration & (work["ระยะเวลา(ปี)"] > time_limit), "จบตามเวลา"] = "เกินเวลา"
     work["สาขาสถิติ"] = work["สาขา"].map(cut_plan_type)
 
     durations = [x / 2 for x in range(1, 23)]
