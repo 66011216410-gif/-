@@ -62,13 +62,26 @@ if st.button("🧪 เพิ่มข้อมูลทดสอบ"):
         result = supabase.table("ข้อมูลประมวลผล").insert(test_row).execute()
         st.success("ส่งข้อมูลทดสอบเข้า Supabase สำเร็จ ✅")
         st.dataframe(pd.DataFrame(result.data), use_container_width=True)
+        if result.data and result.data[0].get("id") is not None:
+            st.session_state["test_row_id"] = result.data[0]["id"]
+            st.info(f"รหัสข้อมูลทดสอบ (id): {result.data[0]['id']}")
     except Exception as e:
         st.error(f"ส่งข้อมูลทดสอบไม่สำเร็จ: {e}")
 
 st.subheader("3. ลบข้อมูลทดสอบ")
-if st.button("🗑️ ลบ TEST_SUPABASE_001"):
-    try:
-        result = supabase.table("ข้อมูลประมวลผล").delete().eq("รหัสนิสิต", "TEST_SUPABASE_001").execute()
-        st.success("ลบข้อมูลทดสอบแล้ว")
-    except Exception as e:
-        st.error(f"ลบข้อมูลทดสอบไม่สำเร็จ: {e}")
+if "test_row_id" in st.session_state:
+    st.caption(f"จะลบข้อมูลทดสอบด้วย id = {st.session_state['test_row_id']}")
+
+if st.button("🗑️ ลบข้อมูลทดสอบล่าสุด"):
+    test_id = st.session_state.get("test_row_id")
+    if test_id is None:
+        st.warning("ยังไม่มีข้อมูลทดสอบที่สร้างจากหน้านี้ ให้กดเพิ่มข้อมูลทดสอบก่อน")
+    else:
+        try:
+            result = supabase.table("ข้อมูลประมวลผล").delete().eq("id", test_id).execute()
+            st.success("ลบข้อมูลทดสอบแล้ว ✅")
+            st.session_state.pop("test_row_id", None)
+        except Exception as e:
+            st.error(f"ลบข้อมูลทดสอบไม่สำเร็จ: {e}")
+
+st.info("หมายเหตุ: การลบใช้คอลัมน์ id ซึ่งเป็นภาษาอังกฤษ เพื่อหลีกเลี่ยงปัญหา PostgREST กับชื่อคอลัมน์ภาษาไทย")
