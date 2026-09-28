@@ -1,0 +1,51 @@
+name: Apply completion status column
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch main app
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("appนิสิตปัจจุบัน.py")
+          text = path.read_text(encoding="utf-8")
+
+          marker = '    work["ระยะเวลา(ปี)"] = work.apply(calc_duration, axis=1)\n'
+          patch = '''    work["ระยะเวลา(ปี)"] = work.apply(calc_duration, axis=1)\n\n    # สร้างคอลัมน์ "จบตามเวลา": ป.โทไม่เกิน 2 ปี และ ป.เอกไม่เกิน 4 ปี\n    graduation_mask = work["สถานะนิสิต"].map(clean_text) == "สำเร็จการศึกษา"\n    time_limit = work["ระดับ"].map({"ป.โท": 2, "ป.เอก": 4})\n    work["จบตามเวลา"] = ""\n    valid_duration = graduation_mask & work["ระยะเวลา(ปี)"].notna() & time_limit.notna()\n    work.loc[valid_duration & (work["ระยะเวลา(ปี)"] <= time_limit), "จบตามเวลา"] = "จบตามเวลา"\n    work.loc[valid_duration & (work["ระยะเวลา(ปี)"] > time_limit), "จบตามเวลา"] = "เกินเวลา"\n'''
+
+          if 'work["จบตามเวลา"]' not in text:
+              if marker not in text:
+                  raise SystemExit("ไม่พบจุดสำหรับแทรกคอลัมน์จบตามเวลา")
+              path.write_text(text.replace(marker, patch, 1), encoding="utf-8")
+
+      - name: Commit and push, then remove this one-time workflow
+        shell: bash
+        run: |
+          if git diff --quiet -- appนิสิตปัจจุบัน.py; then
+            rm -f .github/workflows/apply_completion_status.yml
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/workflows/apply_completion_status.yml
+            git commit -m "Remove one-time completion status workflow"
+            git push
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/apply_completion_status.yml
+          git add appนิสิตปัจจุบัน.py .github/workflows/apply_completion_status.yml
+          git commit -m "Add จบตามเวลา to processed data"
+          git push
