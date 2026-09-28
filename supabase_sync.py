@@ -21,6 +21,20 @@ def get_supabase_client():
     return create_client(url, key)
 
 
+def _json_safe(value):
+    """แปลงค่าจาก pandas/numpy ให้เป็นชนิดที่ Supabase JSON รองรับ"""
+    if pd.isna(value):
+        return None
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except Exception:
+            pass
+    return value
+
+
 def upload_processed_data(processed: pd.DataFrame):
     client = get_supabase_client()
     if client is None:
@@ -28,8 +42,15 @@ def upload_processed_data(processed: pd.DataFrame):
 
     table = "ข้อมูลประมวลผล"
     data = processed.copy()
-    data = data.where(pd.notna(data), None)
-    records = data.to_dict(orient="records")
+
+    # แปลงค่าจาก pandas เช่น Timestamp / numpy scalar / NaN
+    # ให้เป็นชนิด JSON ที่ Supabase รับได้
+    records = []
+    for row in data.to_dict(orient="records"):
+        safe_row = {str(k): _json_safe(v) for k, v in row.items()}
+        # id เป็น identity ให้ Supabase สร้างเอง
+        safe_row.pop("id", None)
+        records.append(safe_row)
 
     # ล้างข้อมูลเดิมก่อนนำเข้าชุดใหม่ เพื่อให้ Power BI เห็นข้อมูลชุดล่าสุดตรงกับเว็บ
     client.table(table).delete().neq("id", 0).execute()
