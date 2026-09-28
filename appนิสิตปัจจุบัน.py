@@ -1046,3 +1046,16 @@ if "stats" in st.session_state:
         ),
         use_container_width=True,
     )
+
+    processed_excel = io.BytesIO()
+    with pd.ExcelWriter(processed_excel, engine="openpyxl") as writer:
+        processed.to_excel(writer, index=False, sheet_name="ข้อมูลประมวลผล")
+    processed_excel.seek(0)
+
+    st.download_button(
+        "⬇️ 4) ดาวน์โหลดเฉพาะข้อมูลประมวลผล",
+        data=processed_excel.getvalue(),
+        file_name="ข้อมูลประมวลผล.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
