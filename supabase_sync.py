@@ -1,4 +1,5 @@
 import os
+from datetime import date, datetime, time
 import pandas as pd
 from supabase import create_client
 
@@ -21,25 +22,34 @@ def get_supabase_client():
 
 
 def _json_safe(value):
-    """แปลงค่าจาก pandas/numpy ให้เป็นชนิดที่ Supabase JSON รองรับ"""
+    """แปลงค่าจาก pandas/numpy/datetime ให้เป็นชนิดที่ Supabase JSON รองรับ"""
     if value is None:
         return None
+
     try:
         if pd.isna(value):
             return None
     except (TypeError, ValueError):
         pass
-    if isinstance(value, pd.Timestamp):
+
+    # ต้องจัดการ datetime ของ Python ด้วย ไม่ใช่เฉพาะ pd.Timestamp
+    if isinstance(value, (pd.Timestamp, datetime, date, time)):
         return value.isoformat()
+
+    # numpy scalar เช่น int64/float64/bool_
     if hasattr(value, "item"):
         try:
-            return value.item()
+            value = value.item()
         except Exception:
             pass
+
+    # เผื่อ item() คืน datetime/date ออกมา
+    if isinstance(value, (pd.Timestamp, datetime, date, time)):
+        return value.isoformat()
+
     return value
 
 
-# คอลัมน์ที่สร้างไว้ใน Supabase
 SUPABASE_COLUMNS = {
     "ปีที่เข้า", "ภาคการศึกษาที่เข้า", "รหัสนิสิต", "คณะ", "วิทยาเขต",
     "สาขา", "ระดับ", "รหัสสถานะนิสิต", "สถานะนิสิต", "ปีที่จบ",
@@ -64,7 +74,6 @@ def upload_processed_excel_sheet(processed_sheet: pd.DataFrame):
             while clean_key.startswith("__"):
                 clean_key = clean_key[1:]
 
-            # ส่งเฉพาะคอลัมน์ที่มีใน schema ของ Supabase
             if clean_key not in SUPABASE_COLUMNS:
                 continue
 
@@ -74,7 +83,6 @@ def upload_processed_excel_sheet(processed_sheet: pd.DataFrame):
         records.append(safe_row)
 
     try:
-        # ล้างข้อมูลชุดเดิม แล้วนำข้อมูลจาก Sheet ผลลัพธ์ชุดล่าสุดเข้าไปแทน
         client.table(table).delete().neq("id", 0).execute()
 
         for start in range(0, len(records), 500):
@@ -85,5 +93,4 @@ def upload_processed_excel_sheet(processed_sheet: pd.DataFrame):
         return False, str(e)
 
 
-# รองรับโค้ดเดิมที่เรียกชื่อฟังก์ชันนี้
 upload_processed_data = upload_processed_excel_sheet
