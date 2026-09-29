@@ -51,7 +51,6 @@ def _json_safe(value):
     return value
 
 
-# ต้องตรงกับ Sheet "ข้อมูลประมวลผล" และตาราง Supabase
 SUPABASE_COLUMNS = [
     "ปีที่เข้า", "ภาคการศึกษาที่เข้า", "รหัสนิสิต", "คำนำหน้า", "ชื่อ", "สกุล",
     "คณะ", "วิทยาเขต", "สาขา", "รหัสระดับ", "ระดับ", "ระบบ",
@@ -64,18 +63,18 @@ SUPABASE_COLUMNS = [
 
 
 def upload_processed_excel_sheet(processed_sheet: pd.DataFrame):
-    """ส่งข้อมูลจาก Sheet 'ข้อมูลประมวลผล' ของ Excel ผลลัพธ์เข้า Supabase โดยตรง"""
+    """ส่ง Sheet ข้อมูลประมวลผลเข้า Supabase โดยชุดใหม่จะแทนที่ชุดเก่าทั้งหมด"""
     client = get_supabase_client()
     if client is None:
         return False, "ยังไม่ได้ตั้งค่า SUPABASE_URL / SUPABASE_KEY ใน Streamlit Secrets"
 
     if processed_sheet is None or processed_sheet.empty:
-        return False, "Sheet ข้อมูลประมวลผลไม่มีข้อมูล จึงไม่ส่งเข้า Supabase"
+        return False, "Sheet ข้อมูลประมวลผลไม่มีข้อมูล จึงไม่ลบหรือเปลี่ยนข้อมูลเดิมใน Supabase"
 
     df = processed_sheet.copy()
     df.columns = [str(c).strip() for c in df.columns]
 
-    # Excel ใช้ __ไฟล์ต้นทาง แต่ Supabase ใช้ ไฟล์ต้นทาง
+    # Excel อาจใช้ __ไฟล์ต้นทาง แต่ Supabase ใช้ ไฟล์ต้นทาง
     if "__ไฟล์ต้นทาง" in df.columns and "ไฟล์ต้นทาง" not in df.columns:
         df = df.rename(columns={"__ไฟล์ต้นทาง": "ไฟล์ต้นทาง"})
 
@@ -83,7 +82,6 @@ def upload_processed_excel_sheet(processed_sheet: pd.DataFrame):
     if missing:
         return False, "Sheet ข้อมูลประมวลผลขาดคอลัมน์: " + ", ".join(missing)
 
-    # ใช้เฉพาะคอลัมน์ของ schema และเรียงลำดับให้ตรงกัน
     df = df[SUPABASE_COLUMNS]
 
     records = []
@@ -96,8 +94,9 @@ def upload_processed_excel_sheet(processed_sheet: pd.DataFrame):
     table = "ข้อมูลประมวลผล"
 
     try:
-        # ให้ Supabase ตรงกับ Excel ผลลัพธ์ชุดล่าสุด
-        client.table(table).delete().neq("id", 0).execute()
+        # สำคัญ: ข้อมูลใหม่จะแทนที่ข้อมูลเก่าทั้งหมด
+        # ลบก่อน INSERT เพื่อไม่ให้ข้อมูลจากรอบก่อนค้างอยู่
+        client.table(table).delete().gte("id", 0).execute()
 
         inserted = 0
         for start in range(0, len(records), 500):
@@ -112,7 +111,6 @@ def upload_processed_excel_sheet(processed_sheet: pd.DataFrame):
                 f"แต่ Supabase ยืนยัน {inserted:,} แถว"
             )
 
-        # ตรวจจำนวนข้อมูลจริงหลัง INSERT
         check = client.table(table).select("id", count="exact").limit(1).execute()
         total = getattr(check, "count", None)
         if total is not None and total != len(records):
@@ -121,11 +119,10 @@ def upload_processed_excel_sheet(processed_sheet: pd.DataFrame):
                 f"แต่พบ {total:,} แถว"
             )
 
-        return True, f"ส่ง Sheet ข้อมูลประมวลผล {len(records):,} รายการเข้า Supabase สำเร็จ"
+        return True, f"แทนที่ข้อมูลเดิมเรียบร้อย: ส่งข้อมูลชุดใหม่ {len(records):,} รายการเข้า Supabase สำเร็จ"
 
     except Exception as e:
         return False, str(e)
 
 
-# รองรับโค้ดเดิม
 upload_processed_data = upload_processed_excel_sheet
