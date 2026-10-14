@@ -403,8 +403,13 @@ if uploaded_files:
         st.success(f"อ่านข้อมูลสำเร็จ {len(uploaded_files):,} ไฟล์ รวม {len(df):,} รายการ")
         current_statuses = {"นิสิตปัจจุบัน สภาพสมบูรณ์", "รักษาสภาพนิสิต", "ลาพักการเรียน"}
         current_df = df[df["สถานะนิสิต"].astype(str).str.strip().isin(current_statuses)].copy()
-        nationality_norm = current_df["ไทย-ต่างชาติ"].astype(str).str.strip(); level_norm = current_df["ระดับ"].map(normalize_level)
-        thai_mask = nationality_norm == "ไทย"; foreign_mask = nationality_norm == "ต่างชาติ"; master_mask = level_norm == "ป.โท"; doctoral_mask = level_norm == "ป.เอก"
+        # ใช้คอลัมน์สัญชาติ(th) จากไฟล์ต้นทาง ไม่บังคับให้มีคอลัมน์ "ไทย-ต่างชาติ"
+        nationality_norm = current_df["สัญชาติ(th)"].astype(str).str.strip() if "สัญชาติ(th)" in current_df.columns else pd.Series("", index=current_df.index)
+        nationality_key = nationality_norm.str.casefold()
+        thai_mask = nationality_key.str.contains(r"ไทย|thai", regex=True, na=False)
+        foreign_mask = nationality_norm.ne("") & nationality_norm.str.casefold().ne("nan") & ~thai_mask
+        level_norm = current_df["ระดับ"].map(normalize_level)
+        master_mask = level_norm == "ป.โท"; doctoral_mask = level_norm == "ป.เอก"
         thai_count = int(thai_mask.sum()); thai_master_count = int((thai_mask & master_mask).sum()); thai_doctoral_count = int((thai_mask & doctoral_mask).sum())
         foreign_count = int(foreign_mask.sum()); foreign_master_count = int((foreign_mask & master_mask).sum()); foreign_doctoral_count = int((foreign_mask & doctoral_mask).sum())
         total_current_count = int(len(current_df)); master_total_count = int(master_mask.sum()); doctoral_total_count = int(doctoral_mask.sum())
