@@ -157,6 +157,22 @@ def metric_row(label, g, limit, durations):
 
 def build_stats(df):
     work = df.copy()
+
+    # สร้างคอลัมน์ "ไทย-ต่างชาติ" จากคอลัมน์สัญชาติ(th)
+    # คำว่า ไทย/thai = ไทย, สัญชาติที่มีค่าอื่น = ต่างชาติ, ค่าว่าง = ไม่ระบุ
+    if "สัญชาติ(th)" in work.columns:
+        nationality = work["สัญชาติ(th)"].astype("string").str.strip()
+        is_blank = nationality.isna() | nationality.eq("") | nationality.str.casefold().eq("nan")
+        is_thai = nationality.str.contains(r"ไทย|thai", case=False, regex=True, na=False)
+        work["ไทย-ต่างชาติ"] = pd.Series(
+            [pd.NA if blank else ("ไทย" if thai else "ต่างชาติ")
+             for thai, blank in zip(is_thai.tolist(), is_blank.tolist())],
+            index=work.index,
+            dtype="string",
+        )
+    elif "ไทย-ต่างชาติ" not in work.columns:
+        work["ไทย-ต่างชาติ"] = pd.NA
+
     work["ระดับ"] = work["ระดับ"].map(normalize_level)
 
     # สร้างคอลัมน์ "ปีการศึกษา+"
