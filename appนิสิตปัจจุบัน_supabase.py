@@ -29,19 +29,26 @@ if processed is not None and isinstance(processed, pd.DataFrame) and not process
             dtype=object,
         )
 
-        # รองรับไฟล์ที่มีคอลัมน์สัญชาติ(th) แต่ไม่มีคอลัมน์ไทย-ต่างชาติ
-        # สร้างคอลัมน์จำแนกสัญชาติให้สอดคล้องกับข้อมูลต้นทาง
-        if "ไทย-ต่างชาติ" not in result_df.columns and "สัญชาติ(th)" in result_df.columns:
+        # สร้าง/เขียนทับคอลัมน์ "ไทย-ต่างชาติ" จาก "สัญชาติ(th)" ทุกครั้ง
+        # เพื่อไม่ใช้ค่าคอลัมน์เดิมที่อาจไม่ตรงกับสัญชาติจริง
+        if "สัญชาติ(th)" in result_df.columns:
             nationality = result_df["สัญชาติ(th)"].astype("string").str.strip()
-            is_thai = nationality.str.contains(r"ไทย|thai", case=False, regex=True, na=False)
-            is_blank = nationality.isna() | nationality.eq("") | nationality.str.casefold().eq("nan")
+            is_blank = (
+                nationality.isna()
+                | nationality.eq("")
+                | nationality.str.casefold().eq("nan")
+            )
+            is_thai = nationality.str.contains(
+                r"ไทย|thai", case=False, regex=True, na=False
+            )
             result_df["ไทย-ต่างชาติ"] = pd.Series(
-                ["ไทย" if thai else (" " if blank else "ต่างชาติ")
-                 for thai, blank in zip(is_thai.tolist(), is_blank.tolist())],
+                [
+                    pd.NA if blank else ("ไทย" if thai else "ต่างชาติ")
+                    for thai, blank in zip(is_thai.tolist(), is_blank.tolist())
+                ],
                 index=result_df.index,
                 dtype="string",
             )
-            result_df.loc[result_df["ไทย-ต่างชาติ"].eq(" "), "ไทย-ต่างชาติ"] = pd.NA
 
         # ตรวจว่า Sheet มีข้อมูลจริงก่อนส่ง
         if result_df.empty:
