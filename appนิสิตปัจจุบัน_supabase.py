@@ -50,31 +50,55 @@ if processed is not None and isinstance(processed, pd.DataFrame) and not process
                 dtype="string",
             )
 
-        # ตรวจข้อมูลซ้ำ 2 รูปแบบ: รหัสนิสิตซ้ำ และแถวข้อมูลเหมือนกันทุกคอลัมน์
-        # แสดงรายการให้ตรวจสอบเท่านั้น ไม่ลบหรือแก้ไขข้อมูลอัตโนมัติ
-        with st.expander("🔎 ตรวจสอบข้อมูลซ้ำ", expanded=False):
-            if "รหัสนิสิต" in result_df.columns:
-                student_ids = result_df["รหัสนิสิต"].astype("string").str.strip()
-                valid_ids = student_ids.notna() & student_ids.ne("") & ~student_ids.str.casefold().eq("nan")
-                duplicate_id_mask = valid_ids & student_ids.duplicated(keep=False)
-                duplicate_id_rows = result_df.loc[duplicate_id_mask].copy()
-                duplicate_id_count = student_ids[valid_ids].duplicated(keep="first").sum()
-                st.write(f"**รหัสนิสิตซ้ำ:** {int(duplicate_id_count)} รหัส")
-                if not duplicate_id_rows.empty:
-                    st.dataframe(duplicate_id_rows, use_container_width=True)
-                else:
-                    st.caption("ไม่พบรหัสนิสิตซ้ำ")
-            else:
-                st.warning("ไม่พบคอลัมน์ ‘รหัสนิสิต’ จึงตรวจรหัสนิสิตซ้ำไม่ได้")
+        # ตรวจข้อมูลซ้ำโดยอัตโนมัติ และแสดงสรุปผลบนหน้าแอปทันที
+        st.subheader("🔎 ผลการตรวจสอบข้อมูลซ้ำ")
 
-            duplicate_row_mask = result_df.duplicated(keep=False)
-            duplicate_rows = result_df.loc[duplicate_row_mask].copy()
-            duplicate_row_count = int(result_df.duplicated(keep="first").sum())
-            st.write(f"**แถวข้อมูลซ้ำทุกคอลัมน์:** {duplicate_row_count} แถวที่เป็นรายการซ้ำ")
-            if not duplicate_rows.empty:
-                st.dataframe(duplicate_rows, use_container_width=True)
+        duplicate_id_rows = pd.DataFrame()
+        duplicate_id_count = 0
+        if "รหัสนิสิต" in result_df.columns:
+            student_ids = result_df["รหัสนิสิต"].astype("string").str.strip()
+            valid_ids = (
+                student_ids.notna()
+                & student_ids.ne("")
+                & ~student_ids.str.casefold().eq("nan")
+            )
+            duplicate_id_mask = valid_ids & student_ids.duplicated(keep=False)
+            duplicate_id_rows = result_df.loc[duplicate_id_mask].copy()
+            duplicate_id_count = int(
+                student_ids[valid_ids].duplicated(keep="first").sum()
+            )
+
+            if duplicate_id_count:
+                st.warning(
+                    f"⚠️ พบข้อมูลรหัสนิสิตซ้ำ {duplicate_id_count} รหัส "
+                    f"({len(duplicate_id_rows)} แถวที่มีรหัสซ้ำ)"
+                )
+                st.dataframe(duplicate_id_rows, use_container_width=True)
             else:
-                st.caption("ไม่พบแถวข้อมูลที่เหมือนกันทุกคอลัมน์")
+                st.success("✅ ไม่พบรหัสนิสิตซ้ำ")
+        else:
+            st.error("❌ ไม่มีคอลัมน์ ‘รหัสนิสิต’ จึงตรวจรหัสนิสิตซ้ำไม่ได้")
+
+        duplicate_row_mask = result_df.duplicated(keep=False)
+        duplicate_rows = result_df.loc[duplicate_row_mask].copy()
+        duplicate_row_count = int(result_df.duplicated(keep="first").sum())
+
+        if duplicate_row_count:
+            st.warning(
+                f"⚠️ พบแถวข้อมูลที่ซ้ำกันทุกคอลัมน์ {duplicate_row_count} รายการ "
+                f"({len(duplicate_rows)} แถวรวมรายการซ้ำ)"
+            )
+            st.dataframe(duplicate_rows, use_container_width=True)
+        else:
+            st.success("✅ ไม่พบแถวข้อมูลที่เหมือนกันทุกคอลัมน์")
+
+        if duplicate_id_count == 0 and duplicate_row_count == 0:
+            st.info("ผลตรวจสอบ: ไม่พบข้อมูลซ้ำตามเงื่อนไขทั้งสองแบบ")
+        else:
+            st.info(
+                "ผลตรวจสอบ: พบข้อมูลซ้ำ กรุณาตรวจสอบรายการด้านบน "
+                "ระบบยังคงเก็บข้อมูลไว้ทั้งหมดและไม่ลบรายการให้อัตโนมัติ"
+            )
 
         # ตรวจว่า Sheet มีข้อมูลจริงก่อนส่ง
         if result_df.empty:
