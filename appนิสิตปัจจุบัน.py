@@ -419,6 +419,22 @@ if uploaded_files:
         st.success(f"อ่านข้อมูลสำเร็จ {len(uploaded_files):,} ไฟล์ รวม {len(df):,} รายการ")
         current_statuses = {"นิสิตปัจจุบัน สภาพสมบูรณ์", "รักษาสภาพนิสิต", "ลาพักการเรียน"}
         current_df = df[df["สถานะนิสิต"].astype(str).str.strip().isin(current_statuses)].copy()
+
+        # Dashboard นับนิสิตปัจจุบันแบบไม่ซ้ำตามรหัสนิสิต
+        # ถ้ารหัสนิสิตว่าง จะเก็บแต่ละแถวไว้เพราะไม่สามารถยืนยันว่าเป็นคนเดียวกันได้
+        if "รหัสนิสิต" in current_df.columns:
+            student_id_key = current_df["รหัสนิสิต"].map(clean_text)
+            valid_student_id = student_id_key.ne("") & student_id_key.str.casefold().ne("nan")
+            current_with_id = current_df.loc[valid_student_id].copy()
+            current_without_id = current_df.loc[~valid_student_id].copy()
+            current_with_id["__student_id_key"] = student_id_key.loc[valid_student_id]
+            current_with_id = current_with_id.drop_duplicates(
+                subset=["__student_id_key"], keep="first"
+            ).drop(columns=["__student_id_key"])
+            current_df = pd.concat(
+                [current_with_id, current_without_id], ignore_index=True
+            )
+
         # ใช้คอลัมน์สัญชาติ(th) จากไฟล์ต้นทาง ไม่บังคับให้มีคอลัมน์ "ไทย-ต่างชาติ"
         nationality_norm = current_df["สัญชาติ(th)"].astype(str).str.strip() if "สัญชาติ(th)" in current_df.columns else pd.Series("", index=current_df.index)
         nationality_key = nationality_norm.str.casefold()
